@@ -18,12 +18,12 @@ final class DependencyInjection
         ClassLoader::loadClass('Connection');
 
         return new Connection(
-            host:     EnvLoader::get('DB_HOST',     '127.0.0.1'),
-            port:     EnvLoader::getInt('DB_PORT',  3306),
+            host: EnvLoader::get('DB_HOST', '127.0.0.1'),
+            port: EnvLoader::getInt('DB_PORT', 3306),
             database: EnvLoader::get('DB_DATABASE', 'crud_usuarios'),
             username: EnvLoader::get('DB_USERNAME', 'root'),
             password: EnvLoader::get('DB_PASSWORD', ''),
-            charset:  EnvLoader::get('DB_CHARSET',  'utf8mb4')
+            charset: EnvLoader::get('DB_CHARSET', 'utf8mb4')
         );
     }
 
@@ -54,13 +54,13 @@ final class DependencyInjection
         ClassLoader::loadClass('EmailSenderService');
 
         return new EmailSenderService(
-            host:        EnvLoader::get('SMTP_HOST',         'smtp.gmail.com'),
-            username:    EnvLoader::get('SMTP_USERNAME',     ''),
-            password:    EnvLoader::get('SMTP_PASSWORD',     ''),
+            host: EnvLoader::get('SMTP_HOST', 'smtp.gmail.com'),
+            username: EnvLoader::get('SMTP_USERNAME', ''),
+            password: EnvLoader::get('SMTP_PASSWORD', ''),
             fromAddress: EnvLoader::get('SMTP_FROM_ADDRESS', ''),
-            fromName:    EnvLoader::get('SMTP_FROM_NAME',    'CRUD Usuarios'),
-            encryption:  EnvLoader::get('SMTP_ENCRYPTION',   'tls'),
-            port:        EnvLoader::getInt('SMTP_PORT',      587)
+            fromName: EnvLoader::get('SMTP_FROM_NAME', 'CRUD Usuarios'),
+            encryption: EnvLoader::get('SMTP_ENCRYPTION', 'tls'),
+            port: EnvLoader::getInt('SMTP_PORT', 587)
         );
     }
 

@@ -21,9 +21,9 @@ final class CreateUserService implements CreateUserUseCase
         GetUserByEmailPort $getUserByEmailPort,
         EmailNotificationService $emailNotification
     ) {
-        $this->saveUserPort       = $saveUserPort;
+        $this->saveUserPort = $saveUserPort;
         $this->getUserByEmailPort = $getUserByEmailPort;
-        $this->emailNotification  = $emailNotification;
+        $this->emailNotification = $emailNotification;
     }
 
     public function execute(CreateUserCommand $command): UserModel

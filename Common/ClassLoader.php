@@ -26,12 +26,12 @@ final class ClassLoader
         'UserEmail' => 'Domain/ValueObjects/UserEmail.php',
         'UserPassword' => 'Domain/ValueObjects/UserPassword.php',
 
-        'UserModel'              => 'Domain/Models/UserModel.php',
-        'EmailDestinationModel'  => 'Domain/Models/EmailDestinationModel.php',
-        'EmailSenderException'   => 'Domain/Exceptions/EmailSenderException.php',
-        'EmailSenderPort'         => 'Application/Ports/Out/EmailSenderPort.php',
+        'UserModel' => 'Domain/Models/UserModel.php',
+        'EmailDestinationModel' => 'Domain/Models/EmailDestinationModel.php',
+        'EmailSenderException' => 'Domain/Exceptions/EmailSenderException.php',
+        'EmailSenderPort' => 'Application/Ports/Out/EmailSenderPort.php',
         'EmailNotificationService' => 'Application/Services/EmailNotificationService.php',
-        'EmailSenderService'     => 'Infrastructure/Adapters/Email/EmailSenderService.php',
+        'EmailSenderService' => 'Infrastructure/Adapters/Email/EmailSenderService.php',
 
         'CreateUserUseCase' => 'Application/Ports/In/CreateUserUseCase.php',
         'UpdateUserUseCase' => 'Application/Ports/In/UpdateUserUseCase.php',

@@ -9,6 +9,7 @@
  * @returns {boolean}
  */
 function confirmDelete(form) {
+
     var name = form.getAttribute('data-name');
     return confirm('¿Eliminar al usuario ' + name + '?');
 }

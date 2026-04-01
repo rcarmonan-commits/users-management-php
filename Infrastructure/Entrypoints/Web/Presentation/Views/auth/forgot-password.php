@@ -20,13 +20,8 @@
     <form method="POST" action="?route=auth.forgot.send">
         <div class="form-group">
             <label for="email">Correo electrónico</label><br>
-            <input
-                type="email"
-                id="email"
-                name="email"
-                value="<?= htmlspecialchars($old['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                autofocus
-            >
+            <input type="email" id="email" name="email"
+                value="<?= htmlspecialchars($old['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autofocus>
             <?php if (!empty($errors['email'])): ?>
                 <div class="field-error"><?= htmlspecialchars($errors['email'], ENT_QUOTES, 'UTF-8') ?></div>
             <?php endif; ?>

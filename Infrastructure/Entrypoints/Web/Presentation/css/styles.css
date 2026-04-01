@@ -61,7 +61,8 @@ table {
     border-collapse: collapse;
 }
 
-table th, table td {
+table th,
+table td {
     padding: 8px 12px;
     border: 1px solid #ccc;
     text-align: left;
@@ -93,13 +94,37 @@ table.detail-table th {
     color: #333;
 }
 
-.btn-primary          { background: #0066cc; color: #fff; }
-.btn-primary:hover    { background: #0052a3; }
-.btn-warning          { background: #e68a00; color: #fff; }
-.btn-warning:hover    { background: #cc7a00; }
-.btn-danger           { background: #cc2200; color: #fff; }
-.btn-danger:hover     { background: #aa1a00; }
-.btn-sm               { padding: 3px 8px; font-size: 0.8rem; }
+.btn-primary {
+    background: #0066cc;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: #0052a3;
+}
+
+.btn-warning {
+    background: #e68a00;
+    color: #fff;
+}
+
+.btn-warning:hover {
+    background: #cc7a00;
+}
+
+.btn-danger {
+    background: #cc2200;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #aa1a00;
+}
+
+.btn-sm {
+    padding: 3px 8px;
+    font-size: 0.8rem;
+}
 
 /* ── Caja de autenticación ── */
 .auth-box {

@@ -35,7 +35,7 @@ final class EnvLoader
             }
 
             [$name, $value] = explode('=', $line, 2);
-            $name  = trim($name);
+            $name = trim($name);
             $value = trim($value);
 
             // Eliminar comillas simples o dobles envolventes: VAR="valor"
@@ -46,7 +46,7 @@ final class EnvLoader
             // Las variables reales del entorno tienen prioridad sobre el .env
             if (getenv($name) === false && !isset($_ENV[$name])) {
                 putenv("{$name}={$value}");
-                $_ENV[$name]    = $value;
+                $_ENV[$name] = $value;
                 $_SERVER[$name] = $value;
             }
         }

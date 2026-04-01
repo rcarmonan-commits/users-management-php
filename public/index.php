@@ -6,7 +6,7 @@ declare(strict_types=1);
 // El .htaccess redirige internamente cualquier URL que no sea public/ hacia aquí.
 // Detectamos ese caso comparando la URL solicitada con la ruta pública esperada.
 
-(function (): void {
+(function (): void{
     $requestPath = rtrim(
         (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH),
         '/'
@@ -68,8 +68,8 @@ if (!isset($routes[$route])) {
     exit;
 }
 
-$definition  = $routes[$route];
-$httpMethod  = strtoupper((string) $_SERVER['REQUEST_METHOD']);
+$definition = $routes[$route];
+$httpMethod = strtoupper((string) $_SERVER['REQUEST_METHOD']);
 
 if ($httpMethod !== $definition['method']) {
     http_response_code(405);
@@ -97,9 +97,9 @@ try {
 
         case 'store':
             $controller = DependencyInjection::getUserController();
-            $form       = getCreateUserFormData();
+            $form = getCreateUserFormData();
             $form['id'] = generateUuid4();
-            $errors     = validateCreateUserForm($form);
+            $errors = validateCreateUserForm($form);
 
             if (!empty($errors)) {
                 Flash::setOld($form);
@@ -130,25 +130,25 @@ try {
 
         case 'show':
             $controller = DependencyInjection::getUserController();
-            $id   = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+            $id = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
             $user = $controller->show($id);
             View::render('users/show', array(
                 'pageTitle' => 'Detalle de usuario',
-                'user'      => $user,
-                'message'   => Flash::message(),
+                'user' => $user,
+                'message' => Flash::message(),
             ));
             break;
 
         case 'edit':
             $controller = DependencyInjection::getUserController();
-            $id   = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+            $id = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
             $user = $controller->show($id);
             View::render('users/edit', buildEditUserViewData($user));
             break;
 
         case 'update':
             $controller = DependencyInjection::getUserController();
-            $form   = getUpdateUserFormData();
+            $form = getUpdateUserFormData();
             $errors = validateUpdateUserForm($form);
 
             if (!empty($errors)) {
@@ -188,14 +188,14 @@ try {
             }
             View::render('auth/login', array(
                 'pageTitle' => 'Iniciar sesión',
-                'message'   => Flash::message(),
-                'errors'    => Flash::errors(),
-                'old'       => Flash::old(),
+                'message' => Flash::message(),
+                'errors' => Flash::errors(),
+                'old' => Flash::old(),
             ));
             break;
 
         case 'authenticate':
-            $email    = trim(strtolower((string) ($_POST['email'] ?? '')));
+            $email = trim(strtolower((string) ($_POST['email'] ?? '')));
             $password = (string) ($_POST['password'] ?? '');
             $authErrors = array();
 
@@ -213,14 +213,14 @@ try {
             }
 
             $loginUseCase = DependencyInjection::getLoginUseCase();
-            $command      = new LoginCommand($email, $password);
-            $user         = $loginUseCase->execute($command);
+            $command = new LoginCommand($email, $password);
+            $user = $loginUseCase->execute($command);
 
             $_SESSION['auth'] = array(
-                'id'    => $user->id()->value(),
-                'name'  => $user->name()->value(),
+                'id' => $user->id()->value(),
+                'name' => $user->name()->value(),
                 'email' => $user->email()->value(),
-                'role'  => $user->role(),
+                'role' => $user->role(),
             );
 
             Flash::setSuccess('Bienvenido/a, ' . $user->name()->value() . '.');
@@ -236,10 +236,10 @@ try {
         case 'forgot':
             View::render('auth/forgot-password', array(
                 'pageTitle' => 'Recuperar contraseña',
-                'message'   => Flash::message(),
-                'success'   => Flash::success(),
-                'errors'    => Flash::errors(),
-                'old'       => Flash::old(),
+                'message' => Flash::message(),
+                'success' => Flash::success(),
+                'errors' => Flash::errors(),
+                'old' => Flash::old(),
             ));
             break;
 
@@ -253,14 +253,14 @@ try {
             }
 
             $repository = DependencyInjection::getUserRepository();
-            $foundUser  = $repository->getByEmail(new UserEmail($forgotEmail));
+            $foundUser = $repository->getByEmail(new UserEmail($forgotEmail));
 
             // Always show generic success to avoid user enumeration.
             if ($foundUser !== null && $foundUser->status() === UserStatusEnum::ACTIVE) {
                 // Generate a secure temporary password (10 hex chars ≥ 8 chars).
                 $tempPassword = bin2hex(random_bytes(5));
-                $newPassword  = UserPassword::fromPlainText($tempPassword);
-                $updatedUser  = $foundUser->changePassword($newPassword);
+                $newPassword = UserPassword::fromPlainText($tempPassword);
+                $updatedUser = $foundUser->changePassword($newPassword);
                 $repository->update($updatedUser);
 
                 sendPasswordRecoveryEmail(
@@ -353,9 +353,9 @@ function buildListUsersViewData(array $users): array
 {
     return array(
         'pageTitle' => 'Lista de usuarios',
-        'users'     => $users,
-        'message'   => Flash::message(),
-        'success'   => Flash::success(),
+        'users' => $users,
+        'message' => Flash::message(),
+        'success' => Flash::success(),
     );
 }
 
@@ -366,8 +366,8 @@ function buildHomeViewData(string $message = ''): array
 {
     return array(
         'pageTitle' => 'Menú principal',
-        'message'   => $message,
-        'success'   => Flash::success(),
+        'message' => $message,
+        'success' => Flash::success(),
     );
 }
 
@@ -377,12 +377,12 @@ function buildHomeViewData(string $message = ''): array
 function buildCreateUserViewData(): array
 {
     return array(
-        'pageTitle'   => 'Registrar usuario',
+        'pageTitle' => 'Registrar usuario',
         'roleOptions' => UserRoleEnum::values(),
-        'message'     => Flash::message(),
-        'success'     => Flash::success(),
-        'errors'      => Flash::errors(),
-        'old'         => Flash::old(),
+        'message' => Flash::message(),
+        'success' => Flash::success(),
+        'errors' => Flash::errors(),
+        'old' => Flash::old(),
     );
 }
 
@@ -392,20 +392,20 @@ function buildCreateUserViewData(): array
 function buildEditUserViewData(UserResponse $user): array
 {
     return array(
-        'pageTitle'     => 'Editar usuario',
-        'user'          => $user,
-        'roleOptions'   => UserRoleEnum::values(),
+        'pageTitle' => 'Editar usuario',
+        'user' => $user,
+        'roleOptions' => UserRoleEnum::values(),
         'statusOptions' => UserStatusEnum::values(),
-        'message'       => Flash::message(),
-        'errors'        => Flash::errors(),
-        'old'           => Flash::old(),
+        'message' => Flash::message(),
+        'errors' => Flash::errors(),
+        'old' => Flash::old(),
     );
 }
 
 
 function generateUuid4(): string
 {
-    $data    = random_bytes(16);
+    $data = random_bytes(16);
     $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
     $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
 
@@ -419,10 +419,10 @@ function generateUuid4(): string
 function getCreateUserFormData(): array
 {
     return array(
-        'name'     => isset($_POST['name'])     ? trim((string) $_POST['name'])     : '',
-        'email'    => isset($_POST['email'])    ? trim((string) $_POST['email'])    : '',
+        'name' => isset($_POST['name']) ? trim((string) $_POST['name']) : '',
+        'email' => isset($_POST['email']) ? trim((string) $_POST['email']) : '',
         'password' => isset($_POST['password']) ? trim((string) $_POST['password']) : '',
-        'role'     => isset($_POST['role'])     ? trim((string) $_POST['role'])     : '',
+        'role' => isset($_POST['role']) ? trim((string) $_POST['role']) : '',
     );
 }
 
@@ -432,12 +432,12 @@ function getCreateUserFormData(): array
 function getUpdateUserFormData(): array
 {
     return array(
-        'id'       => isset($_POST['id'])       ? trim((string) $_POST['id'])       : '',
-        'name'     => isset($_POST['name'])     ? trim((string) $_POST['name'])     : '',
-        'email'    => isset($_POST['email'])    ? trim((string) $_POST['email'])    : '',
-        'password' => isset($_POST['password']) ? (string) $_POST['password']       : '',
-        'role'     => isset($_POST['role'])     ? trim((string) $_POST['role'])     : '',
-        'status'   => isset($_POST['status'])   ? trim((string) $_POST['status'])   : '',
+        'id' => isset($_POST['id']) ? trim((string) $_POST['id']) : '',
+        'name' => isset($_POST['name']) ? trim((string) $_POST['name']) : '',
+        'email' => isset($_POST['email']) ? trim((string) $_POST['email']) : '',
+        'password' => isset($_POST['password']) ? (string) $_POST['password'] : '',
+        'role' => isset($_POST['role']) ? trim((string) $_POST['role']) : '',
+        'status' => isset($_POST['status']) ? trim((string) $_POST['status']) : '',
     );
 }
 

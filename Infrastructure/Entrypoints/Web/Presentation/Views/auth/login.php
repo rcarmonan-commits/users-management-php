@@ -12,13 +12,8 @@
     <form method="POST" action="?route=auth.authenticate">
         <div class="form-group">
             <label for="email">Correo electrónico</label><br>
-            <input
-                type="email"
-                id="email"
-                name="email"
-                value="<?= htmlspecialchars($old['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                autofocus
-            >
+            <input type="email" id="email" name="email"
+                value="<?= htmlspecialchars($old['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autofocus>
             <?php if (!empty($errors['email'])): ?>
                 <div class="field-error"><?= htmlspecialchars($errors['email'], ENT_QUOTES, 'UTF-8') ?></div>
             <?php endif; ?>
@@ -26,12 +21,7 @@
 
         <div class="form-group">
             <label for="password">Contraseña</label><br>
-            <input
-                type="password"
-                id="password"
-                name="password"
-                autocomplete="current-password"
-            >
+            <input type="password" id="password" name="password" autocomplete="current-password">
             <?php if (!empty($errors['password'])): ?>
                 <div class="field-error"><?= htmlspecialchars($errors['password'], ENT_QUOTES, 'UTF-8') ?></div>
             <?php endif; ?>

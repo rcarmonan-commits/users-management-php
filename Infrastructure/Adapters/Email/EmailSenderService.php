@@ -21,7 +21,7 @@ final class EmailSenderService implements EmailSenderPort
     private string $fromAddress;
     private string $fromName;
     private string $encryption;
-    private int    $port;
+    private int $port;
 
     public function __construct(
         string $host,
@@ -30,15 +30,15 @@ final class EmailSenderService implements EmailSenderPort
         string $fromAddress,
         string $fromName,
         string $encryption = 'tls',
-        int    $port       = 587
+        int $port = 587
     ) {
-        $this->host        = $host;
-        $this->username    = $username;
-        $this->password    = $password;
+        $this->host = $host;
+        $this->username = $username;
+        $this->password = $password;
         $this->fromAddress = $fromAddress;
-        $this->fromName    = $fromName;
-        $this->encryption  = $encryption;
-        $this->port        = $port;
+        $this->fromName = $fromName;
+        $this->encryption = $encryption;
+        $this->port = $port;
     }
 
     public function send(EmailDestinationModel $destination): void
@@ -47,14 +47,14 @@ final class EmailSenderService implements EmailSenderPort
             $mailer = new PHPMailer(true);
 
             $mailer->isSMTP();
-            $mailer->SMTPDebug  = 0;
-            $mailer->SMTPAuth   = true;
-            $mailer->Host       = $this->host;
-            $mailer->Username   = $this->username;
-            $mailer->Password   = $this->password;
+            $mailer->SMTPDebug = 0;
+            $mailer->SMTPAuth = true;
+            $mailer->Host = $this->host;
+            $mailer->Username = $this->username;
+            $mailer->Password = $this->password;
             $mailer->SMTPSecure = $this->encryption;
-            $mailer->Port       = $this->port;
-            $mailer->CharSet    = 'UTF-8';
+            $mailer->Port = $this->port;
+            $mailer->CharSet = 'UTF-8';
 
             $mailer->setFrom($this->fromAddress, $this->fromName);
             $mailer->addAddress(
@@ -64,7 +64,7 @@ final class EmailSenderService implements EmailSenderPort
 
             $mailer->isHTML(true);
             $mailer->Subject = $destination->getSubject();
-            $mailer->Body    = $destination->getBody();
+            $mailer->Body = $destination->getBody();
 
             $mailer->send();
 

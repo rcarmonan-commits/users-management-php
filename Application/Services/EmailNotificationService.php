@@ -20,7 +20,7 @@ final class EmailNotificationService
     {
         try {
             $subject = 'Tu cuenta ha sido creada — CRUD Usuarios';
-            $body    = $this->buildUserCreatedBody($user, $plainPassword);
+            $body = $this->buildUserCreatedBody($user, $plainPassword);
 
             $destination = new EmailDestinationModel(
                 $user->email()->value(),
@@ -41,7 +41,7 @@ final class EmailNotificationService
     {
         try {
             $subject = 'Tu cuenta ha sido actualizada — CRUD Usuarios';
-            $body    = $this->buildUserUpdatedBody($user);
+            $body = $this->buildUserUpdatedBody($user);
 
             $destination = new EmailDestinationModel(
                 $user->email()->value(),
@@ -71,10 +71,10 @@ final class EmailNotificationService
         return str_replace(
             ['[[nombre]]', '[[email]]', '[[pass]]', '[[rol]]'],
             [
-                htmlspecialchars($user->name()->value(),  ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($user->name()->value(), ENT_QUOTES, 'UTF-8'),
                 htmlspecialchars($user->email()->value(), ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($plainPassword,          ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($user->role(),           ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($plainPassword, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($user->role(), ENT_QUOTES, 'UTF-8'),
             ],
             $html
         );
@@ -93,9 +93,9 @@ final class EmailNotificationService
         return str_replace(
             ['[[nombre]]', '[[email]]', '[[rol]]'],
             [
-                htmlspecialchars($user->name()->value(),  ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($user->name()->value(), ENT_QUOTES, 'UTF-8'),
                 htmlspecialchars($user->email()->value(), ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($user->role(),           ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($user->role(), ENT_QUOTES, 'UTF-8'),
             ],
             $html
         );

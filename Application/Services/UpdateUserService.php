@@ -30,22 +30,22 @@ final class UpdateUserService implements UpdateUserUseCase
         GetUserByEmailPort $getUserByEmailPort,
         EmailNotificationService $emailNotification
     ) {
-        $this->updateUserPort     = $updateUserPort;
-        $this->getUserByIdPort    = $getUserByIdPort;
+        $this->updateUserPort = $updateUserPort;
+        $this->getUserByIdPort = $getUserByIdPort;
         $this->getUserByEmailPort = $getUserByEmailPort;
-        $this->emailNotification  = $emailNotification;
+        $this->emailNotification = $emailNotification;
     }
 
     public function execute(UpdateUserCommand $command): UserModel
     {
-        $userId      = new UserId($command->getId());
+        $userId = new UserId($command->getId());
         $currentUser = $this->getUserByIdPort->getById($userId);
 
         if ($currentUser === null) {
             throw UserNotFoundException::becauseIdWasNotFound($userId->value());
         }
 
-        $newEmail        = new UserEmail($command->getEmail());
+        $newEmail = new UserEmail($command->getEmail());
         $userWithSameEmail = $this->getUserByEmailPort->getByEmail($newEmail);
 
         if ($userWithSameEmail !== null && !$userWithSameEmail->id()->equals($userId)) {

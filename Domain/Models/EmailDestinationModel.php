@@ -29,13 +29,25 @@ final class EmailDestinationModel
         }
 
         $this->destinationEmail = $destinationEmail;
-        $this->destinationName  = $destinationName;
-        $this->subject          = $subject;
-        $this->body             = $body;
+        $this->destinationName = $destinationName;
+        $this->subject = $subject;
+        $this->body = $body;
     }
 
-    public function getDestinationEmail(): string { return $this->destinationEmail; }
-    public function getDestinationName(): string  { return $this->destinationName; }
-    public function getSubject(): string          { return $this->subject; }
-    public function getBody(): string             { return $this->body; }
+    public function getDestinationEmail(): string
+    {
+        return $this->destinationEmail;
+    }
+    public function getDestinationName(): string
+    {
+        return $this->destinationName;
+    }
+    public function getSubject(): string
+    {
+        return $this->subject;
+    }
+    public function getBody(): string
+    {
+        return $this->body;
+    }
 }

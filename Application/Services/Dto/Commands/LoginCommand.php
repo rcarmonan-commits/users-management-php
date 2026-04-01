@@ -9,7 +9,7 @@ final class LoginCommand
 
     public function __construct(string $email, string $password)
     {
-        $this->email    = trim($email);
+        $this->email = trim($email);
         $this->password = $password;
     }
 

@@ -9,7 +9,7 @@ final class LoginWebRequest
 
     public function __construct(string $email, string $password)
     {
-        $this->email    = trim(strtolower($email));
+        $this->email = trim(strtolower($email));
         $this->password = $password;
     }
 

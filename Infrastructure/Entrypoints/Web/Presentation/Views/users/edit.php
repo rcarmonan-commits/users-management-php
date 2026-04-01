@@ -14,12 +14,8 @@
 
     <div class="form-group">
         <label for="name">Nombre</label><br>
-        <input
-            type="text"
-            id="name"
-            name="name"
-            value="<?= htmlspecialchars($old['name'] ?? $user->getName(), ENT_QUOTES, 'UTF-8') ?>"
-        >
+        <input type="text" id="name" name="name"
+            value="<?= htmlspecialchars($old['name'] ?? $user->getName(), ENT_QUOTES, 'UTF-8') ?>">
         <?php if (!empty($errors['name'])): ?>
             <div class="field-error"><?= htmlspecialchars($errors['name'], ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
@@ -27,12 +23,8 @@
 
     <div class="form-group">
         <label for="email">Correo</label><br>
-        <input
-            type="email"
-            id="email"
-            name="email"
-            value="<?= htmlspecialchars($old['email'] ?? $user->getEmail(), ENT_QUOTES, 'UTF-8') ?>"
-        >
+        <input type="email" id="email" name="email"
+            value="<?= htmlspecialchars($old['email'] ?? $user->getEmail(), ENT_QUOTES, 'UTF-8') ?>">
         <?php if (!empty($errors['email'])): ?>
             <div class="field-error"><?= htmlspecialchars($errors['email'], ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
@@ -40,13 +32,7 @@
 
     <div class="form-group">
         <label for="password">Contraseña <small>(déjala en blanco para no cambiarla)</small></label><br>
-        <input
-            type="password"
-            id="password"
-            name="password"
-            value=""
-            autocomplete="new-password"
-        >
+        <input type="password" id="password" name="password" value="" autocomplete="new-password">
         <?php if (!empty($errors['password'])): ?>
             <div class="field-error"><?= htmlspecialchars($errors['password'], ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
@@ -56,10 +42,7 @@
         <label for="role">Rol</label><br>
         <select id="role" name="role">
             <?php foreach ($roleOptions as $opt): ?>
-                <option
-                    value="<?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>"
-                    <?= (($old['role'] ?? $user->getRole()) === $opt) ? 'selected' : '' ?>
-                >
+                <option value="<?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>" <?= (($old['role'] ?? $user->getRole()) === $opt) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>
                 </option>
             <?php endforeach; ?>
@@ -73,10 +56,7 @@
         <label for="status">Estado</label><br>
         <select id="status" name="status">
             <?php foreach ($statusOptions as $opt): ?>
-                <option
-                    value="<?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>"
-                    <?= (($old['status'] ?? $user->getStatus()) === $opt) ? 'selected' : '' ?>
-                >
+                <option value="<?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>" <?= (($old['status'] ?? $user->getStatus()) === $opt) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($opt, ENT_QUOTES, 'UTF-8') ?>
                 </option>
             <?php endforeach; ?>
