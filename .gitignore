@@ -1,61 +1,45 @@
 # PHP / Composer
-
 /vendor/
 composer.phar
 composer.lock
 
-# Logs de PHP
+# Logs y almacenamiento temporal de adaptadores locales (Cache, RateLimit, Cola JSONL, Outbox SMTP)
 *.log
 php_errors.log
+/storage/
 
 # Cache de OPcache / APCu dumps
 *.cache
 
-# Configuración local sensible
+# Configuración local sensible (OWASP Secret Management)
 .env
 .env.local
 .env.*.local
-# La plantilla SÍ se sube al repositorio
 !.env.example
 
-
-# Base de datos — solo dumps de datos (los scripts de esquema SÍ van al repo)
+# Base de datos — solo dumps de datos (los scripts DDL de esquema SÍ van al repo)
 *.dump
 *-dump.sql
 *_dump.sql
 backup*.sql
 
-
 # Sistema operativo
-
-# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
-
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
-
-# Linux
 *~
 
-
 # Editores e IDEs
-
-
-# VS Code
-
 .vscode/*
 !.vscode/extensions.json
-!.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 *.code-workspace
-
 *.swp
 *.swo
 *.bak
@@ -66,15 +50,10 @@ $RECYCLE.BIN/
 nbproject/
 .netbeans/
 
-
-# Node (si en algún momento se añaden herramientas front-end)
-
+# Node
 node_modules/
 npm-debug.log*
 yarn-error.log*
-
-# Documentación tecnica, diagramas, manuales, pasos para montar el entorno de desarrollo, etc.
-
 
 docs/
 .vscode/settings.json

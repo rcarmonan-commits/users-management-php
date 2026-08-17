@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — MENSAJES FLASH Y PRESERVACIÓN DE ENTRADA: Flash
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Entrypoints/Web/Presentation`)
+ * PATRÓN: Flash Message Pattern (Session-based UI Feedback)
+ * PRINCIPIO SOLID: SRP (Gestión de notificaciones efímeras entre redirecciones PRG)
+ *
+ * ¿QUÉ HACE?
+ *   Permite almacenar mensajes de éxito, error o aviso en la sesión que se destruyen automáticamente tras su primera lectura.
+ *
+ * ¿CÓMO LO HACE?
+ *   Almacena en $_SESSION['_flash'] y ofrece métodos setSuccess(), setError(), getMessages() y keepOldInput().
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Garantiza retroalimentación visual al usuario tras peticiones POST redirigidas con el patrón PRG.
+ * ============================================================================
+ */
+
 final class Flash
 {
     public static function start(): void
