@@ -16,25 +16,33 @@ require_once __DIR__ . '/../../../Domain/Enums/UserStatusEnum.php';
 
 final class UserApplicationMapper
 {
-    public static function fromCreateCommandToModel(CreateUserCommand $command): UserModel
-    {
+    public static function fromCreateCommandToModel(
+        CreateUserCommand $command,
+        string $initialStatus = UserStatusEnum::ACTIVE
+    ): UserModel {
         return new UserModel(
             new UserId($command->getId()),
             new UserName($command->getName()),
             new UserEmail($command->getEmail()),
             UserPassword::fromPlainText($command->getPassword()),
             $command->getRole(),
-            UserStatusEnum::PENDING
+            $initialStatus
         );
     }
 
-    public static function fromUpdateCommandToModel(UpdateUserCommand $command): UserModel
-    {
+    public static function fromUpdateCommandToModel(
+        UpdateUserCommand $command,
+        ?UserPassword $fallbackPassword = null
+    ): UserModel {
+        $password = ($command->getPassword() !== '')
+            ? UserPassword::fromPlainText($command->getPassword())
+            : ($fallbackPassword ?? UserPassword::fromPlainText($command->getPassword()));
+
         return new UserModel(
             new UserId($command->getId()),
             new UserName($command->getName()),
             new UserEmail($command->getEmail()),
-            UserPassword::fromPlainText($command->getPassword()),
+            $password,
             $command->getRole(),
             $command->getStatus()
         );
@@ -61,7 +69,7 @@ final class UserApplicationMapper
             'email' => $user->email()->value(),
             'password' => $user->password()->value(),
             'role' => $user->role(),
-            'status' => $user->status()
+            'status' => $user->status(),
         );
     }
 
