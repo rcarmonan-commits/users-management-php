@@ -10,10 +10,17 @@ require_once __DIR__ . '/../../Domain/Exceptions/EmailSenderException.php';
 final class EmailNotificationService
 {
     private EmailSenderPort $emailSenderPort;
+    private bool $strictMode;
+    private string $templatesDir;
 
-    public function __construct(EmailSenderPort $emailSenderPort)
-    {
+    public function __construct(
+        EmailSenderPort $emailSenderPort,
+        bool $strictMode = false,
+        string $templatesDir = ''
+    ) {
         $this->emailSenderPort = $emailSenderPort;
+        $this->strictMode = $strictMode;
+        $this->templatesDir = rtrim($templatesDir, "/\\");
     }
 
     public function notifyUserCreated(UserModel $user, string $plainPassword): void
@@ -30,10 +37,11 @@ final class EmailNotificationService
             );
 
             $this->emailSenderPort->send($destination);
-
         } catch (EmailSenderException $e) {
             error_log('[EmailNotificationService] ' . $e->getMessage());
-            throw $e;
+            if ($this->strictMode) {
+                throw $e;
+            }
         }
     }
 
@@ -51,66 +59,61 @@ final class EmailNotificationService
             );
 
             $this->emailSenderPort->send($destination);
-
         } catch (EmailSenderException $e) {
             error_log('[EmailNotificationService] ' . $e->getMessage());
-            throw $e;
+            if ($this->strictMode) {
+                throw $e;
+            }
         }
     }
 
     private function buildUserCreatedBody(UserModel $user, string $plainPassword): string
     {
-        $templatePath = $this->resolveTemplatePath('user-created.html');
+        $safeName = htmlspecialchars($user->name()->value(), ENT_QUOTES, 'UTF-8');
+        $safeEmail = htmlspecialchars($user->email()->value(), ENT_QUOTES, 'UTF-8');
+        $safePass = htmlspecialchars($plainPassword, ENT_QUOTES, 'UTF-8');
+        $safeRole = htmlspecialchars($user->role(), ENT_QUOTES, 'UTF-8');
 
-        if (!is_file($templatePath)) {
-            throw new EmailSenderException('Plantilla no encontrada: ' . $templatePath);
+        $templatePath = $this->resolveTemplatePath('user-created.html');
+        if ($templatePath !== '' && is_file($templatePath)) {
+            $html = (string) file_get_contents($templatePath);
+
+            return str_replace(
+                ['[[nombre]]', '[[email]]', '[[pass]]', '[[rol]]'],
+                [$safeName, $safeEmail, $safePass, $safeRole],
+                $html
+            );
         }
 
-        $html = (string) file_get_contents($templatePath);
-
-        return str_replace(
-            ['[[nombre]]', '[[email]]', '[[pass]]', '[[rol]]'],
-            [
-                htmlspecialchars($user->name()->value(), ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($user->email()->value(), ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($plainPassword, ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($user->role(), ENT_QUOTES, 'UTF-8'),
-            ],
-            $html
-        );
+        return "<h2>Cuenta creada</h2><p>Hola {$safeName} ({$safeEmail}), tu rol asignado es {$safeRole}.</p>";
     }
 
     private function buildUserUpdatedBody(UserModel $user): string
     {
-        $templatePath = $this->resolveTemplatePath('user-updated.html');
+        $safeName = htmlspecialchars($user->name()->value(), ENT_QUOTES, 'UTF-8');
+        $safeEmail = htmlspecialchars($user->email()->value(), ENT_QUOTES, 'UTF-8');
+        $safeRole = htmlspecialchars($user->role(), ENT_QUOTES, 'UTF-8');
 
-        if (!is_file($templatePath)) {
-            throw new EmailSenderException('Plantilla no encontrada: ' . $templatePath);
+        $templatePath = $this->resolveTemplatePath('user-updated.html');
+        if ($templatePath !== '' && is_file($templatePath)) {
+            $html = (string) file_get_contents($templatePath);
+
+            return str_replace(
+                ['[[nombre]]', '[[email]]', '[[rol]]'],
+                [$safeName, $safeEmail, $safeRole],
+                $html
+            );
         }
 
-        $html = (string) file_get_contents($templatePath);
-
-        return str_replace(
-            ['[[nombre]]', '[[email]]', '[[rol]]'],
-            [
-                htmlspecialchars($user->name()->value(), ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($user->email()->value(), ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($user->role(), ENT_QUOTES, 'UTF-8'),
-            ],
-            $html
-        );
+        return "<h2>Cuenta actualizada</h2><p>Hola {$safeName} ({$safeEmail}), tu rol actual es {$safeRole}.</p>";
     }
 
     private function resolveTemplatePath(string $filename): string
     {
-        // __DIR__ = Application/Services  →  dirname 2 veces = raíz del proyecto
-        return dirname(__DIR__, 2)
-            . DIRECTORY_SEPARATOR . 'Infrastructure'
-            . DIRECTORY_SEPARATOR . 'Entrypoints'
-            . DIRECTORY_SEPARATOR . 'Web'
-            . DIRECTORY_SEPARATOR . 'Presentation'
-            . DIRECTORY_SEPARATOR . 'Views'
-            . DIRECTORY_SEPARATOR . 'emails'
-            . DIRECTORY_SEPARATOR . $filename;
+        if ($this->templatesDir === '') {
+            return '';
+        }
+
+        return $this->templatesDir . DIRECTORY_SEPARATOR . $filename;
     }
 }

@@ -13,9 +13,7 @@ require_once __DIR__ . '/../../Domain/Exceptions/UserAlreadyExistsException.php'
 require_once __DIR__ . '/../../Domain/Exceptions/UserNotFoundException.php';
 require_once __DIR__ . '/../../Domain/Models/UserModel.php';
 require_once __DIR__ . '/../../Domain/ValueObjects/UserId.php';
-require_once __DIR__ . '/../../Domain/ValueObjects/UserName.php';
 require_once __DIR__ . '/../../Domain/ValueObjects/UserEmail.php';
-require_once __DIR__ . '/../../Domain/ValueObjects/UserPassword.php';
 
 final class UpdateUserService implements UpdateUserUseCase
 {
@@ -52,17 +50,9 @@ final class UpdateUserService implements UpdateUserUseCase
             throw UserAlreadyExistsException::becauseEmailAlreadyExists($newEmail->value());
         }
 
-        $password = ($command->getPassword() !== '')
-            ? UserPassword::fromPlainText($command->getPassword())
-            : $currentUser->password();
-
-        $userToUpdate = new UserModel(
-            $userId,
-            new UserName($command->getName()),
-            new UserEmail($command->getEmail()),
-            $password,
-            $command->getRole(),
-            $command->getStatus()
+        $userToUpdate = UserApplicationMapper::fromUpdateCommandToModel(
+            $command,
+            $currentUser->password()
         );
 
         $updatedUser = $this->updateUserPort->update($userToUpdate);
