@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — DTO VIEW RESPONSE: UserResponse
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Entrypoints/Web/Controllers/Dto`)
+ * PATRÓN: View Model / Response DTO
+ * PRINCIPIO SOLID: SRP (Exponer datos de usuario formateados para la vista)
+ *
+ * ¿QUÉ HACE?
+ *   Objeto seguro que expone datos de usuario a las plantillas PHP sin filtrar la contraseña ni datos sensibles.
+ *
+ * ¿CÓMO LO HACE?
+ *   Mapea id, name, email, role y status.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Previene la fuga accidental de hashes de contraseñas en las vistas HTML.
+ * ============================================================================
+ */
+
 final class UserResponse
 {
     private string $id;
