@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — MODELO DE DOMINIO: EmailDestinationModel
+ * ============================================================================
+ * CAPA: Dominio (`Domain/Models`) — Núcleo de Notificaciones
+ * PATRÓN: Domain Entity / Value Carrier
+ * PRINCIPIO SOLID: SRP (Encapsular los datos del destinatario de correo)
+ *
+ * ¿QUÉ HACE?
+ *   Modela la tupla de información necesaria para notificar a un usuario por correo electrónico (destinatario, nombre y asunto).
+ *
+ * ¿CÓMO LO HACE?
+ *   Valida la integridad de la dirección de correo y expone getters inmutables para el servicio de notificación.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Evita pasar parámetros sueltos (primitivas) en las capas de aplicación y adaptadores de correo.
+ * ============================================================================
+ */
+
 final class EmailDestinationModel
 {
     private string $destinationEmail;

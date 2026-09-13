@@ -1,5 +1,25 @@
 <?php
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — CLASE BASE DE EVENTOS DE DOMINIO: EventDomain
+ * ============================================================================
+ * CAPA: Dominio (`Domain/Events`)
+ * PATRÓN: Domain Event Base Pattern (Fowler / Evans)
+ * PRINCIPIO SOLID: OCP (Base extensible para cualquier evento del negocio)
+ *
+ * ¿QUÉ HACE?
+ *   Contrato base para todos los eventos de dominio del sistema, registrando timestamp de ocurrencia e identificador único.
+ *
+ * ¿CÓMO LO HACE?
+ *   Asigna fecha y hora en formato ISO 8601 al momento exacto de instanciar el evento.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Permite que la arquitectura registre auditoría, notificaciones y colas de mensajes de forma desacoplada.
+ * ============================================================================
+ */
+
 abstract class DomainEvent
 {
     private $eventName;
