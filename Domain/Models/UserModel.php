@@ -2,6 +2,28 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — MODELO RICO DDD: UserModel (Entidad Raíz de Agregado)
+ * ============================================================================
+ * CAPA: Dominio (`Domain/Models`) — Núcleo Puro de Negocio
+ * PATRÓN: Aggregate Root (DDD) + Encapsulamiento + Value Objects Inmutables
+ * PRINCIPIO SOLID: SRP (Garantizar la integridad e invariantes del Usuario)
+ *
+ * ¿QUÉ HACE?
+ *   Representa a la entidad Usuario en el núcleo de negocio del sistema, encapsulando su identidad (UserId), nombre (UserName), correo (UserEmail), contraseña (UserPassword), rol y estado mediante tipos inmutables.
+ *
+ * ¿CÓMO LO HACE?
+ *   1. Recibe Value Objects estrictamente validados en su constructor, imposibilitando estados corruptos.
+ *   2. Valida la pertenencia de rol y estado con UserRoleEnum y UserStatusEnum.
+ *   3. Ofrece métodos semánticos de negocio como create(), updateProfile(), changePassword(), activate() y suspend().
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Porque en DDD el Dominio no conoce bases de datos, HTTP, frameworks ni SQL. Toda la lógica de integridad reside en el modelo, asegurando que un Usuario siempre sea válido sin importar el canal de entrada.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../ValueObjects/UserId.php';
 require_once __DIR__ . '/../ValueObjects/UserName.php';
 require_once __DIR__ . '/../ValueObjects/UserEmail.php';

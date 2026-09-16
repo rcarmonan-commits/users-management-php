@@ -1,5 +1,25 @@
 <?php
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — VALUE OBJECT DDD: UserPassword
+ * ============================================================================
+ * CAPA: Dominio (`Domain/ValueObjects`)
+ * PATRÓN: Value Object (DDD) + Seguridad Criptográfica OWASP
+ * PRINCIPIO SOLID: SRP (Gestión segura de contraseñas y hashing BCrypt)
+ *
+ * ¿QUÉ HACE?
+ *   Encapsula la contraseña del usuario, distinguiendo entre contraseñas en texto plano y hashes seguros ya computados.
+ *
+ * ¿CÓMO LO HACE?
+ *   Ofrece fromPlainText() que valida longitud mínima y genera hash con password_hash(..., PASSWORD_BCRYPT), y fromHash() para hidratar desde la persistencia.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Impide que contraseñas en texto plano se almacenen o viajen accidentalmente por la arquitectura.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../Exceptions/InvalidUserPasswordException.php';
 
 class UserPassword

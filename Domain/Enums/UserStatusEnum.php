@@ -1,5 +1,25 @@
 <?php
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — ENUM DE DOMINIO: UserStatusEnum
+ * ============================================================================
+ * CAPA: Dominio (`Domain/Enums`)
+ * PATRÓN: Domain Enum / Lifecycle State
+ * PRINCIPIO SOLID: SRP (Estados válidos del ciclo de vida del Usuario)
+ *
+ * ¿QUÉ HACE?
+ *   Define los estados del usuario en el sistema: ACTIVE, INACTIVE, SUSPENDED.
+ *
+ * ¿CÓMO LO HACE?
+ *   Ofrece el método estático ensureIsValid() para garantizar transiciones de estado legales.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Garantiza que la máquina de estados del usuario sea coherente en todas las capas.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../Exceptions/InvalidUserStatusException.php';
 
 class UserStatusEnum
