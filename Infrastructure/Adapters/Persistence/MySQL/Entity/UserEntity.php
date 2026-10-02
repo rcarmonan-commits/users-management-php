@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — ENTIDAD DE PERSISTENCIA: UserEntity
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Adapters/Persistence/MySQL/Entity`)
+ * PATRÓN: Persistence Entity / Active Record State Representation
+ * PRINCIPIO SOLID: SRP (Representar la estructura física de la tabla users)
+ *
+ * ¿QUÉ HACE?
+ *   Representa fielmente la estructura de columnas y tipos de datos de la tabla `users` en la base de datos relacional.
+ *
+ * ¿CÓMO LO HACE?
+ *   Mapea directamente id, name, email, password, role y status.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Evita contaminar el modelo de dominio con anotaciones o tipos de datos exclusivos de la base de datos.
+ * ============================================================================
+ */
+
 final class UserEntity
 {
     private string $id;

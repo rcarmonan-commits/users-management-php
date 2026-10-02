@@ -2,6 +2,28 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — ADAPTADOR SECUNDARIO (REPOSITORIO MYSQL): UserRepositoryMySQL
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Adapters/Persistence/MySQL/Repository`)
+ * PATRÓN: Repository Pattern (Fowler) + Data Mapper + Secondary Adapter (Hexagonal)
+ * PRINCIPIO SOLID: DIP (Implementa puertos definidos por la Aplicación) + SRP (Persistencia SQL)
+ *
+ * ¿QUÉ HACE?
+ *   Implementa los contratos SaveUserPort, UpdateUserPort, GetUserByIdPort, GetUserByEmailPort, GetAllUsersPort y DeleteUserPort utilizando PDO y sentencias SQL parametrizadas.
+ *
+ * ¿CÓMO LO HACE?
+ *   1. Utiliza consultas preparadas para proteger contra inyección SQL.
+ *   2. Convierte entre filas relacionales (Entity/DTO) y modelos de dominio con UserPersistenceMapper.
+ *   3. Soporta entornos MySQL locales y cloud (Alwaysdata) de forma resiliente.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Mantiene la base de datos como un detalle técnico reemplazable. El dominio y la aplicación nunca conocen la sintaxis SQL.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../../../../../Application/Ports/Out/SaveUserPort.php';
 require_once __DIR__ . '/../../../../../Application/Ports/Out/UpdateUserPort.php';
 require_once __DIR__ . '/../../../../../Application/Ports/Out/GetUserByIdPort.php';
