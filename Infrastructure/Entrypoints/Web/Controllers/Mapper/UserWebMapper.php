@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — MAPPER WEB: UserWebMapper
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Entrypoints/Web/Controllers/Mapper`)
+ * PATRÓN: Presentation Mapper
+ * PRINCIPIO SOLID: SRP (Conversión entre peticiones HTTP y DTOs CQRS)
+ *
+ * ¿QUÉ HACE?
+ *   Transforma peticiones WebRequest a comandos CreateUserCommand / UpdateUserCommand y convierte UserModel a UserResponse.
+ *
+ * ¿CÓMO LO HACE?
+ *   Limpia y tipa las entradas del formulario HTML antes de enviarlas al caso de uso.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Impide que datos HTTP sin sanitizar ingresen directamente a la capa de aplicación.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../Dto/CreateUserRequest.php';
 require_once __DIR__ . '/../Dto/UpdateUserRequest.php';
 require_once __DIR__ . '/../Dto/UserResponse.php';
