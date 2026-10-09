@@ -2,6 +2,29 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — SERVICIO DE APLICACIÓN: LoginService
+ * ============================================================================
+ * CAPA: Aplicación (`Application/Services`)
+ * PATRÓN: Authentication Orchestrator + Security Boundary
+ * PRINCIPIO SOLID: SRP (Validar credenciales de usuario)
+ *
+ * ¿QUÉ HACE?
+ *   Implementa LoginUseCase, verificando las credenciales suministradas contra la base de datos.
+ *
+ * ¿CÓMO LO HACE?
+ *   1. Busca el usuario por correo con GetUserByEmailPort.
+ *   2. Si no existe, lanza InvalidCredentialsException.
+ *   3. Comprueba la contraseña con password_verify().
+ *   4. Si coincide, retorna el UserModel autenticado.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Protege el sistema contra enumeración de usuarios lanzando siempre la misma excepción ante credenciales inválidas.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../Ports/In/LoginUseCase.php';
 require_once __DIR__ . '/../Ports/Out/GetUserByEmailPort.php';
 require_once __DIR__ . '/Dto/Commands/LoginCommand.php';

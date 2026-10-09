@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — MAPPER DE PERSISTENCIA: UserPersistenceMapper
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Adapters/Persistence/MySQL/Mapper`)
+ * PATRÓN: Data Mapper Pattern (Fowler)
+ * PRINCIPIO SOLID: SRP (Conversión bidireccional Dominio <-> Persistencia SQL)
+ *
+ * ¿QUÉ HACE?
+ *   Transforma instancias de UserModel a UserPersistenceDto/UserEntity y viceversa.
+ *
+ * ¿CÓMO LO HACE?
+ *   Reconstruye los Value Objects de Dominio al leer desde la base de datos, garantizando que el modelo resultante sea 100% válido.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Aísla el modelo de dominio de cualquier cambio en los nombres de columnas o tipos de la base de datos.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/../Dto/UserPersistenceDto.php';
 require_once __DIR__ . '/../Entity/UserEntity.php';
 

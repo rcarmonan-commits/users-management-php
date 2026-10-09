@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — UTILIDAD COMPARTIDA: EnvLoader (Cargador de Variables de Entorno)
+ * ============================================================================
+ * CAPA: Común (`Common/EnvLoader`) — Soporte Transversal
+ * PATRÓN: Environment Configuration Loader
+ * PRINCIPIO SOLID: SRP (Carga y parseo seguro de archivos .env)
+ *
+ * ¿QUÉ HACE?
+ *   Carga las variables de entorno desde el archivo .env hacia $_ENV y getenv() respetando configuraciones preexistentes.
+ *
+ * ¿CÓMO LO HACE?
+ *   Lee línea por línea, ignora comentarios (#) y parsea pares clave=valor.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Permite la configuración flexible en local (sin Docker o con Docker) y en la nube (Render, Alwaysdata).
+ * ============================================================================
+ */
+
 /**
  * Carga variables de entorno desde un archivo .env.
  *

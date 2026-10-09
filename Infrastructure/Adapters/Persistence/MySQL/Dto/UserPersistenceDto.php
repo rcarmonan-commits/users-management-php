@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — DTO DE PERSISTENCIA: UserPersistenceDto
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Adapters/Persistence/MySQL/Dto`)
+ * PATRÓN: Data Transfer Object (DTO)
+ * PRINCIPIO SOLID: SRP (Transportar datos entre repositorio y mapeadores)
+ *
+ * ¿QUÉ HACE?
+ *   Transporta datos planos entre las sentencias SQL PDO y el mapeador UserPersistenceMapper.
+ *
+ * ¿CÓMO LO HACE?
+ *   Expone propiedades públicas tipadas con los valores exactos que consume el motor de base de datos.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Separa limpiamente la representación en memoria de las filas SQL.
+ * ============================================================================
+ */
+
 final class UserPersistenceDto
 {
     private string $id;
