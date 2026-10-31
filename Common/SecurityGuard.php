@@ -2,6 +2,29 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — BLINDAJE DE SEGURIDAD EMPRESARIAL: SecurityGuard (OWASP Web & API Top 10)
+ * ============================================================================
+ * CAPA: Común (`Common/SecurityGuard`) — Protección Transversal
+ * PATRÓN: Security Guard / Policy Enforcement Point + Anti-Tampering
+ * PRINCIPIO SOLID: SRP (Centralizar políticas de seguridad, autenticación JWT, RBAC y anti-CSRF)
+ *
+ * ¿QUÉ HACE?
+ *   Implementa todas las salvaguardas de seguridad exigidas por OWASP: emisión y verificación de JWT (RFC 7519 HS256), control de acceso basado en roles (RBAC), tokens anti-CSRF, mitigación de ataques de fuerza bruta (Rate Limiting), saneamiento anti-CRLF y anti-SSRF.
+ *
+ * ¿CÓMO LO HACE?
+ *   1. Emite tokens JWT con firma HMAC-SHA256 validada en tiempo constante (hash_equals).
+ *   2. Verifica claims (exp, sub, role) y revoca accesos de usuarios inactivos o eliminados.
+ *   3. Aplica Rate Limiting en login y endpoints sensibles con ventanas deslizantes.
+ *   4. Gestiona banderas de clave temporal para forzar cambio de contraseña tras recuperación.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Protege integralmente la aplicación tanto en su capa Web como en su API REST sin acoplarse a frameworks de terceros.
+ * ============================================================================
+ */
+
 /**
  * ============================================================================
  * GUÍA DE SEGURIDAD ANTIVULNERACIONES (OWASP TOP 10) — SecurityGuard

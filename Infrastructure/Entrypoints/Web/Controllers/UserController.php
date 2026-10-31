@@ -2,6 +2,29 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — CONTROLADOR WEB MVC/PRG: UserController
+ * ============================================================================
+ * CAPA: Infraestructura — Adaptador Primario (`Infrastructure/Entrypoints/Web/Controllers`)
+ * PATRÓN: Front Controller Action / MVC Controller + Post-Redirect-Get (PRG)
+ * PRINCIPIO SOLID: SRP (Gestionar ciclo de vida HTTP de usuarios) + DIP
+ *
+ * ¿QUÉ HACE?
+ *   Controlador Web que atiende las peticiones del navegador para el CRUD de Usuarios (listar, ver, crear, editar y eliminar).
+ *
+ * ¿CÓMO LO HACE?
+ *   1. Extrae datos de $_GET y $_POST.
+ *   2. Transforma las entradas en comandos CQRS mediante UserWebMapper.
+ *   3. Invoca los casos de uso (Ports/In).
+ *   4. Renderiza vistas con View::render() o redirige aplicando PRG con mensajes Flash.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Desacopla la navegación del usuario de la lógica de aplicación, evitando envíos duplicados con el patrón PRG.
+ * ============================================================================
+ */
+
 require_once __DIR__ . '/Mapper/UserWebMapper.php';
 
 require_once __DIR__ . '/../../../../Application/Ports/In/CreateUserUseCase.php';
