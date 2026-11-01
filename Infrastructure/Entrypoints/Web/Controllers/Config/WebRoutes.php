@@ -14,6 +14,7 @@ final class WebRoutes
                 'method' => 'GET',
                 'action' => 'home',
             ),
+            // Entidad común: Usuario (CRUDL)
             'users.create' => array(
                 'method' => 'GET',
                 'action' => 'create',
@@ -42,6 +43,36 @@ final class WebRoutes
                 'method' => 'POST',
                 'action' => 'delete',
             ),
+            // Entidad asignada #6: Gasto (CRUDL)
+            'gastos.create' => array(
+                'method' => 'GET',
+                'action' => 'gastos.create',
+            ),
+            'gastos.store' => array(
+                'method' => 'POST',
+                'action' => 'gastos.store',
+            ),
+            'gastos.index' => array(
+                'method' => 'GET',
+                'action' => 'gastos.index',
+            ),
+            'gastos.show' => array(
+                'method' => 'GET',
+                'action' => 'gastos.show',
+            ),
+            'gastos.edit' => array(
+                'method' => 'GET',
+                'action' => 'gastos.edit',
+            ),
+            'gastos.update' => array(
+                'method' => 'POST',
+                'action' => 'gastos.update',
+            ),
+            'gastos.delete' => array(
+                'method' => 'POST',
+                'action' => 'gastos.delete',
+            ),
+            // Autenticación y recuperación
             'auth.login' => array(
                 'method' => 'GET',
                 'action' => 'login',
@@ -61,6 +92,27 @@ final class WebRoutes
             'auth.forgot.send' => array(
                 'method' => 'POST',
                 'action' => 'forgot.send',
+            ),
+            'emails.outbox' => array(
+                'method' => 'GET',
+                'action' => 'emails.outbox',
+            ),
+            'smtp.config' => array(
+                'method' => 'GET',
+                'action' => 'smtp.config',
+            ),
+            'smtp.save' => array(
+                'method' => 'POST',
+                'action' => 'smtp.save',
+            ),
+            // Documentación OpenAPI / Swagger
+            'swagger' => array(
+                'method' => 'GET',
+                'action' => 'swagger',
+            ),
+            'openapi' => array(
+                'method' => 'GET',
+                'action' => 'openapi',
             ),
         );
     }
