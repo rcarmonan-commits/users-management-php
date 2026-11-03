@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+
+/**
+ * ============================================================================
+ * GUÍA ARQUITECTÓNICA — DTO WEB REQUEST: CreateUserRequest
+ * ============================================================================
+ * CAPA: Infraestructura (`Infrastructure/Entrypoints/Web/Controllers/Dto`)
+ * PATRÓN: Request DTO
+ * PRINCIPIO SOLID: SRP (Encapsular datos recibidos por formulario de creación)
+ *
+ * ¿QUÉ HACE?
+ *   Encapsula los datos enviados por el usuario en el formulario Web de registro.
+ *
+ * ¿CÓMO LO HACE?
+ *   Expone métodos para extraer y validar datos provenientes de $_POST.
+ *
+ * ¿POR QUÉ SE HACE ASÍ?
+ *   Provee una interfaz fuertemente tipada para los datos del formulario.
+ * ============================================================================
+ */
+
 final class CreateUserWebRequest
 {
     private string $id;
