@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 /**
  * ============================================================================
- * GUÍA ARQUITECTÓNICA — AUTOCARGADOR DETERMINISTA SIN FRAMEWORKS: ClassLoader
+ * GUÍA ARQUITECTÓNICA — AUTOCARGADOR DETERMINISTA COMPLETO: ClassLoader
  * ============================================================================
- * CAPA: Composición Transversal (`Common/ClassLoader.php`)
+ * CAPA: Raíz de Composición (`Common/ClassLoader.php`)
  *
  * ¿QUÉ HACE?
- *   Registra un mapa explícito `Clase => Ruta relativa` mediante `spl_autoload_register`
- *   para resolver bajo demanda cualquier componente de Dominio, Aplicación,
- *   Adaptadores o Entrypoints sin depender de frameworks pesados externos.
+ *   Registra el mapa explícito de todas las clases de `Domain/`, `Application/`,
+ *   `Infrastructure/Adapters/`, `Infrastructure/Entrypoints/` y `Common/`.
  * ============================================================================
  */
 final class ClassLoader
@@ -148,18 +147,31 @@ final class ClassLoader
         'FileQueueEventPublisherAdapter' => 'Infrastructure/Adapters/Queue/FileQueueEventPublisherAdapter.php',
         'TaxIndicatorRestAdapter' => 'Infrastructure/Adapters/Rest/TaxIndicatorRestAdapter.php',
 
-        // Entrypoints Web
+        // Entrypoints Web — Usuario + Gasto (#6)
         'CreateUserWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/CreateUserRequest.php',
         'UpdateUserWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/UpdateUserRequest.php',
         'LoginWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/LoginWebRequest.php',
         'UserResponse' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/UserResponse.php',
         'UserWebMapper' => 'Infrastructure/Entrypoints/Web/Controllers/Mapper/UserWebMapper.php',
         'UserController' => 'Infrastructure/Entrypoints/Web/Controllers/UserController.php',
+        'CreateGastoWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/CreateGastoRequest.php',
+        'UpdateGastoWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/UpdateGastoRequest.php',
+        'GastoResponse' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/GastoResponse.php',
+        'GastoWebMapper' => 'Infrastructure/Entrypoints/Web/Controllers/Mapper/GastoWebMapper.php',
+        'GastoController' => 'Infrastructure/Entrypoints/Web/Controllers/GastoController.php',
         'WebRoutes' => 'Infrastructure/Entrypoints/Web/Controllers/Config/WebRoutes.php',
         'View' => 'Infrastructure/Entrypoints/Web/Presentation/View.php',
         'Flash' => 'Infrastructure/Entrypoints/Web/Presentation/Flash.php',
 
-        // Seguridad y Raíz de Composición
+        // Entrypoints REST + ErrorHandler
+        'ApiRequest' => 'Infrastructure/Entrypoints/Rest/Dto/ApiRequest.php',
+        'ApiResponse' => 'Infrastructure/Entrypoints/Rest/Dto/ApiResponse.php',
+        'RestApiMapper' => 'Infrastructure/Entrypoints/Rest/Mapper/RestApiMapper.php',
+        'ErrorHandler' => 'Infrastructure/Entrypoints/Rest/ErrorHandler.php',
+        'UserRestController' => 'Infrastructure/Entrypoints/Rest/UserRestController.php',
+        'GastoRestController' => 'Infrastructure/Entrypoints/Rest/GastoRestController.php',
+
+        // Seguridad y Composición
         'SecurityGuard' => 'Common/SecurityGuard.php',
         'DependencyInjection' => 'Common/DependencyInjection.php',
     );

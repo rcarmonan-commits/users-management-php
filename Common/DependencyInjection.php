@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/ClassLoader.php';
 require_once __DIR__ . '/EnvLoader.php';
-require_once __DIR__ . '/SecurityGuard.php';
 
 /**
  * ============================================================================
- * GUÍA ARQUITECTÓNICA — RAÍZ DE COMPOSICIÓN (COMPOSITION ROOT): DependencyInjection
+ * GUÍA ARQUITECTÓNICA — RAÍZ DE COMPOSICIÓN HEXAGONAL: DependencyInjection
  * ============================================================================
- * CAPA: Composición Transversal (`Common/DependencyInjection.php`)
- * PATRÓN: Inversión de Control (IoC) + Inyección Manual por Constructor (SOLID - DIP)
+ * CAPA: Transversal (`Common/DependencyInjection.php`)
+ * PATRÓN: Composition Root + Inyección de Dependencias Pura
  *
  * ¿QUÉ HACE?
- *   Es el ÚNICO lugar de toda la aplicación que conoce simultáneamente las interfaces
- *   de `Application/Ports` y las implementaciones concretas de `Infrastructure/Adapters`.
- *   Ensambla el grafo de objetos e inyecta los adaptadores activos (MySQL Cloud o InMemory).
+ *   Conecta los Puertos de Salida (`*Port`) con sus Adaptadores concretos (MySQL PDO,
+ *   InMemory, Caché, Cola JSONL, Cliente REST, PHPMailer/HTTPS) y los entrega a los
+ *   Servicios de Aplicación y Controladores Web/REST.
  * ============================================================================
  */
 final class DependencyInjection
@@ -37,12 +36,20 @@ final class DependencyInjection
 
     public static function resetForTesting(?InMemoryUserRepository $userRepo = null, ?InMemoryGastoRepository $gastoRepo = null): void
     {
+        ClassLoader::loadClass('InMemoryUserRepository');
+        ClassLoader::loadClass('InMemoryGastoRepository');
+        ClassLoader::loadClass('FileCacheAdapter');
+        ClassLoader::loadClass('FileQueueEventPublisherAdapter');
+        ClassLoader::loadClass('EmailSenderService');
+        ClassLoader::loadClass('SecurityGuard');
+
         self::$mysqlAvailable = false;
-        $suffix = getmypid() . '_' . uniqid('', true);
         self::$inMemoryUserRepository = $userRepo ?? new InMemoryUserRepository(true, null);
         self::$inMemoryGastoRepository = $gastoRepo ?? new InMemoryGastoRepository(true, null);
+        $suffix = getmypid() . '_' . uniqid('', true);
         self::$cacheAdapter = new FileCacheAdapter(sys_get_temp_dir() . '/gastos_test_cache_' . $suffix);
         self::$eventPublisher = new FileQueueEventPublisherAdapter(sys_get_temp_dir() . '/gastos_test_queue_' . $suffix . '.jsonl');
+        self::$emailSender = new EmailSenderService('', '', '', '', 'Test', 'tls', 587, sys_get_temp_dir() . '/gastos_test_emails_' . $suffix, false);
         SecurityGuard::setRateLimitDirectory(sys_get_temp_dir() . '/gastos_test_rl_' . $suffix);
         SecurityGuard::setJwtSecret('test_hmac_sha256_secret_key_' . $suffix);
     }
@@ -439,6 +446,13 @@ final class DependencyInjection
         return new UserWebMapper();
     }
 
+    public static function getGastoWebMapper(): GastoWebMapper
+    {
+        ClassLoader::loadClass('GastoWebMapper');
+
+        return new GastoWebMapper();
+    }
+
     public static function getUserController(): UserController
     {
         ClassLoader::loadClass('UserController');
@@ -450,6 +464,47 @@ final class DependencyInjection
             self::getGetAllUsersUseCase(),
             self::getDeleteUserUseCase(),
             self::getUserWebMapper()
+        );
+    }
+
+    public static function getGastoController(): GastoController
+    {
+        ClassLoader::loadClass('GastoController');
+
+        return new GastoController(
+            self::getCreateGastoUseCase(),
+            self::getUpdateGastoUseCase(),
+            self::getGetGastoByIdUseCase(),
+            self::getGetAllGastosUseCase(),
+            self::getDeleteGastoUseCase(),
+            self::getGastoWebMapper()
+        );
+    }
+
+    public static function getUserRestController(): UserRestController
+    {
+        ClassLoader::loadClass('UserRestController');
+
+        return new UserRestController(
+            self::getCreateUserUseCase(),
+            self::getUpdateUserUseCase(),
+            self::getGetUserByIdUseCase(),
+            self::getGetAllUsersUseCase(),
+            self::getDeleteUserUseCase(),
+            self::getLoginUseCase()
+        );
+    }
+
+    public static function getGastoRestController(): GastoRestController
+    {
+        ClassLoader::loadClass('GastoRestController');
+
+        return new GastoRestController(
+            self::getCreateGastoUseCase(),
+            self::getUpdateGastoUseCase(),
+            self::getGetGastoByIdUseCase(),
+            self::getGetAllGastosUseCase(),
+            self::getDeleteGastoUseCase()
         );
     }
 

@@ -1,0 +1,300 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API Hexagonal DDD & CQRS — Usuarios y Gastos (#6) con Autenticación JWT HS256 y Blindaje OWASP",
+    "version": "2.1.0",
+    "description": "Especificación OpenAPI 3.0.3 para el CRUDL de la entidad común Usuario y la entidad asignada #6 Gasto en PHP 8.3 siguiendo Arquitectura Hexagonal, DDD, CQRS y seguridad OWASP API Top 10. Todos los endpoints de negocio exigen un token Bearer JWT (HS256 / HMAC-SHA256) emitido por POST /api/auth/login.",
+    "contact": {
+      "name": "Rosary Eilyn Carmona Navarro",
+      "email": "rcarmonan@unicartagena.edu.co"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Servidor activo"
+    }
+  ],
+  "tags": [
+    { "name": "Sistema", "description": "Diagnóstico operativo e indicadores tributarios" },
+    { "name": "Auth", "description": "Emisión de tokens JWT HS256 con protección anti-fuerza bruta" },
+    { "name": "Usuarios", "description": "CRUDL protegido por JWT + RBAC de la entidad común Usuario" },
+    { "name": "Gastos", "description": "CRUDL protegido por JWT + RBAC de la entidad asignada #6 Gasto" }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Estado operativo público del servicio (Health Check)",
+        "security": [],
+        "responses": {
+          "200": { "description": "Servicio saludable" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Autenticar credenciales y emitir token Bearer JWT (HS256)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "admin@crud.com" },
+                  "password": { "type": "string", "example": "Admin12345" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Credenciales válidas; retorna access_token Bearer JWT" },
+          "401": { "description": "Credenciales inválidas o cuenta inactiva" },
+          "429": { "description": "Demasiados intentos fallidos (Rate Limit activo)" }
+        }
+      }
+    },
+    "/api/tax-indicators": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Indicadores tributarios vigentes obtenidos por TaxIndicatorRestPort (Requiere JWT)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Indicadores IVA y UVT" },
+          "401": { "description": "Token Bearer JWT ausente, inválido, expirado o revocado" }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Listar todos los usuarios (Query — Requiere JWT)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Listado de usuarios" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" }
+        }
+      },
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Crear un nuevo usuario (Command — Requiere JWT con rol ADMIN)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUserInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Usuario creado" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "403": { "description": "Rol insuficiente (exclusivo ADMIN)" },
+          "409": { "description": "Correo duplicado" },
+          "413": { "description": "Payload mayor a 64 KB" },
+          "422": { "description": "Regla de dominio violada" }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Consultar usuario por ID (Query — Requiere JWT)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detalle del usuario" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "404": { "description": "Usuario no encontrado" }
+        }
+      },
+      "put": {
+        "tags": ["Usuarios"],
+        "summary": "Actualizar usuario existente (Command — ADMIN o titular de cuenta Anti-BOLA)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateUserInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Usuario actualizado" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "403": { "description": "Intento de modificar cuenta ajena sin rol ADMIN (Anti-BOLA)" },
+          "404": { "description": "Usuario no encontrado" },
+          "422": { "description": "Regla de dominio violada" }
+        }
+      },
+      "delete": {
+        "tags": ["Usuarios"],
+        "summary": "Eliminar usuario por ID (Command — Exclusivo ADMIN, prohíbe auto-eliminación)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Usuario eliminado" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "403": { "description": "Rol insuficiente o intento de auto-eliminación" },
+          "404": { "description": "Usuario no encontrado" }
+        }
+      }
+    },
+    "/api/gastos": {
+      "get": {
+        "tags": ["Gastos"],
+        "summary": "Listar gastos con filtros opcionales y totales acumulados (Query — Requiere JWT)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "nombreUsuario", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "fechaDesde", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } },
+          { "name": "fechaHasta", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": { "description": "Listado y sumatoria de gastos" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" }
+        }
+      },
+      "post": {
+        "tags": ["Gastos"],
+        "summary": "Registrar un nuevo gasto validando invariante de IVA (Command — ADMIN / MEMBER)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GastoInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Gasto registrado" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "403": { "description": "Rol REVIEWER de solo lectura no autorizado para mutar gastos" },
+          "413": { "description": "Payload mayor a 64 KB" },
+          "422": { "description": "Inconsistencia contable de IVA o datos inválidos" }
+        }
+      }
+    },
+    "/api/gastos/{id}": {
+      "get": {
+        "tags": ["Gastos"],
+        "summary": "Consultar un gasto por ID (Query — Requiere JWT)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detalle del gasto" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "404": { "description": "Gasto no encontrado" }
+        }
+      },
+      "put": {
+        "tags": ["Gastos"],
+        "summary": "Actualizar un gasto existente (Command — ADMIN / MEMBER)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GastoInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Gasto actualizado" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "403": { "description": "Rol REVIEWER de solo lectura" },
+          "404": { "description": "Gasto no encontrado" },
+          "422": { "description": "Inconsistencia contable de IVA o datos inválidos" }
+        }
+      },
+      "delete": {
+        "tags": ["Gastos"],
+        "summary": "Eliminar un gasto por ID (Command — ADMIN / MEMBER)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Gasto eliminado" },
+          "401": { "description": "Token Bearer JWT ausente o inválido" },
+          "403": { "description": "Rol REVIEWER de solo lectura" },
+          "404": { "description": "Gasto no encontrado" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Autentícate en POST /api/auth/login para obtener tu access_token JWT firmado con HMAC-SHA256 y pégalo aquí."
+      }
+    },
+    "schemas": {
+      "CreateUserInput": {
+        "type": "object",
+        "required": ["name", "email", "password", "role"],
+        "properties": {
+          "name": { "type": "string", "example": "Rosary Carmona" },
+          "email": { "type": "string", "example": "rcarmonan@unicartagena.edu.co" },
+          "password": { "type": "string", "example": "ClaveSegura2026" },
+          "role": { "type": "string", "enum": ["ADMIN", "MEMBER", "REVIEWER"], "example": "ADMIN" }
+        }
+      },
+      "UpdateUserInput": {
+        "type": "object",
+        "required": ["name", "email", "role", "status"],
+        "properties": {
+          "name": { "type": "string", "example": "Rosary Eilyn Carmona" },
+          "email": { "type": "string", "example": "rcarmonan@unicartagena.edu.co" },
+          "password": { "type": "string", "example": "" },
+          "role": { "type": "string", "enum": ["ADMIN", "MEMBER", "REVIEWER"], "example": "ADMIN" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "PENDING", "BLOCKED"], "example": "ACTIVE" }
+        }
+      },
+      "GastoInput": {
+        "type": "object",
+        "required": [
+          "fecha",
+          "valorTotalSinIVA",
+          "ivaTotal",
+          "valorTotalConIVA",
+          "nombreUsuario",
+          "lugar",
+          "descripcion"
+        ],
+        "properties": {
+          "fecha": { "type": "string", "format": "date", "example": "2026-10-15" },
+          "valorTotalSinIVA": { "type": "number", "example": 150000 },
+          "ivaTotal": { "type": "number", "example": 28500 },
+          "valorTotalConIVA": { "type": "number", "example": 178500 },
+          "nombreUsuario": { "type": "string", "example": "Administrador" },
+          "lugar": { "type": "string", "example": "Librería Nacional Cartagena" },
+          "descripcion": { "type": "string", "example": "Adquisición de bibliografía de arquitectura de software" }
+        }
+      }
+    }
+  }
+}
