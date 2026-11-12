@@ -2,28 +2,29 @@
 
 declare(strict_types=1);
 
-// Guardia de seguridad: bloquear acceso directo a archivos/carpetas 
-// El .htaccess redirige internamente cualquier URL que no sea public/ hacia aquí.
-// Detectamos ese caso comparando la URL solicitada con la ruta pública esperada.
+// Soporte nativo para archivos físicos cuando se ejecuta con php -S localhost:8080 -t public public/index.php
+if (PHP_SAPI === 'cli-server') {
+    $cliPath = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+    $candidate = __DIR__ . $cliPath;
+    if ($cliPath !== '/' && $cliPath !== '/index.php' && is_file($candidate)) {
+        return false;
+    }
+}
 
-(function (): void{
-    $requestPath = rtrim(
-        (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH),
-        '/'
-    );
-    // dirname de /crud-usuarios/public/index.php  →  /crud-usuarios/public
-    $publicBase = rtrim(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
-
-    // Si la URL pedida no comienza con /…/public/, fue un acceso directo indebido.
-    if ($requestPath !== $publicBase && !str_starts_with($requestPath, $publicBase . '/')) {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
-        $dest = isset($_SESSION['auth']['id']) ? 'home' : 'auth.login';
-        header('Location: ' . $publicBase . '/index.php?route=' . $dest);
+// Entrega universal de hojas de estilo y scripts de presentación (compatible con Apache, Docker y php -S)
+if (isset($_GET['asset'])) {
+    $asset = (string) $_GET['asset'];
+    if ($asset === 'css') {
+        header('Content-Type: text/css; charset=UTF-8');
+        readfile(__DIR__ . '/../Infrastructure/Entrypoints/Web/Presentation/css/styles.css');
         exit;
     }
-})();
+    if ($asset === 'js') {
+        header('Content-Type: application/javascript; charset=UTF-8');
+        readfile(__DIR__ . '/../Infrastructure/Entrypoints/Web/Presentation/js/validaciones.js');
+        exit;
+    }
+}
 
 require_once __DIR__ . '/../Common/ClassLoader.php';
 require_once __DIR__ . '/../Common/DependencyInjection.php';
@@ -31,23 +32,58 @@ require_once __DIR__ . '/../Infrastructure/Entrypoints/Web/Presentation/View.php
 require_once __DIR__ . '/../Infrastructure/Entrypoints/Web/Presentation/Flash.php';
 
 DependencyInjection::boot();
+
+// ──────────────────────────────────────────────────────────────
+// Resolución de ruta entrante para API REST y Swagger OpenAPI
+// ──────────────────────────────────────────────────────────────
+$rawUriPath = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+$normalizedScriptDir = rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'))), '/');
+$relativePath = $rawUriPath;
+
+if ($normalizedScriptDir !== '' && str_starts_with($relativePath, $normalizedScriptDir)) {
+    $relativePath = substr($relativePath, strlen($normalizedScriptDir));
+}
+$relativePath = '/' . ltrim($relativePath, '/');
+
+if (isset($_GET['api'])) {
+    $relativePath = '/api/' . ltrim((string) $_GET['api'], '/');
+}
+
+if ($relativePath === '/openapi.json') {
+    serveOpenApiSpec();
+}
+
+if ($relativePath === '/swagger') {
+    serveSwaggerUi();
+}
+
+if (str_starts_with($relativePath, '/api/')) {
+    dispatchRestApi($relativePath);
+}
+
+// ──────────────────────────────────────────────────────────────
+// Guardia de seguridad Web (IIFE) — corregida para barras Windows/Linux
+// ──────────────────────────────────────────────────────────────
+(function () use ($rawUriPath, $normalizedScriptDir): void {
+    $requestPath = rtrim(str_replace('\\', '/', $rawUriPath), '/');
+    if ($normalizedScriptDir !== '' && $requestPath !== $normalizedScriptDir && !str_starts_with($requestPath, $normalizedScriptDir . '/')) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $dest = isset($_SESSION['auth']['id']) ? 'home' : 'auth.login';
+        header('Location: ' . $normalizedScriptDir . '/index.php?route=' . $dest);
+        exit;
+    }
+})();
+
 Flash::start();
 
 // ──────────────────────────────────────────────────────────────
 // Auth helpers
 // ──────────────────────────────────────────────────────────────
-
 function isLoggedIn(): bool
 {
     return isset($_SESSION['auth']['id']);
-}
-
-function requireAuth(): void
-{
-    if (!isLoggedIn()) {
-        Flash::setMessage('Debes iniciar sesión para acceder a esta sección.');
-        View::redirect('auth.login');
-    }
 }
 
 function getLoggedUser(): array
@@ -56,9 +92,8 @@ function getLoggedUser(): array
 }
 
 // ──────────────────────────────────────────────────────────────
-// Routing
+// Enrutamiento Web (?route=)
 // ──────────────────────────────────────────────────────────────
-
 $route = isset($_GET['route']) ? trim((string) $_GET['route']) : 'home';
 $routes = WebRoutes::routes();
 
@@ -69,7 +104,7 @@ if (!isset($routes[$route])) {
 }
 
 $definition = $routes[$route];
-$httpMethod = strtoupper((string) $_SERVER['REQUEST_METHOD']);
+$httpMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
 if ($httpMethod !== $definition['method']) {
     http_response_code(405);
@@ -77,8 +112,19 @@ if ($httpMethod !== $definition['method']) {
     exit;
 }
 
-// Protect all user management routes behind authentication.
-$publicActions = array('home', 'login', 'authenticate', 'logout', 'forgot', 'forgot.send', 'create', 'store');
+$publicActions = array(
+    'home',
+    'login',
+    'authenticate',
+    'logout',
+    'forgot',
+    'forgot.send',
+    'create',
+    'store',
+    'swagger',
+    'openapi',
+);
+
 if (!in_array($definition['action'], $publicActions, true) && !isLoggedIn()) {
     Flash::setMessage('Debes iniciar sesión para acceder a esta sección.');
     View::redirect('auth.login');
@@ -86,11 +132,19 @@ if (!in_array($definition['action'], $publicActions, true) && !isLoggedIn()) {
 
 try {
     switch ($definition['action']) {
-
         case 'home':
             View::render('home', buildHomeViewData());
             break;
 
+        case 'swagger':
+            serveSwaggerUi();
+            break;
+
+        case 'openapi':
+            serveOpenApiSpec();
+            break;
+
+        // ── CRUDL Usuarios ──
         case 'create':
             View::render('users/create', buildCreateUserViewData());
             break;
@@ -119,7 +173,7 @@ try {
             $controller->store($request);
 
             Flash::setSuccess('Usuario registrado correctamente.');
-            View::redirect('users.index');
+            View::redirect(isLoggedIn() ? 'users.index' : 'auth.login');
             break;
 
         case 'index':
@@ -182,6 +236,117 @@ try {
             View::redirect('users.index');
             break;
 
+        // ── CRUDL Gastos (Ejercicio #6) ──
+        case 'gastos.create':
+            View::render('gastos/create', buildCreateGastoViewData());
+            break;
+
+        case 'gastos.store':
+            $gastoController = DependencyInjection::getGastoController();
+            $form = getGastoFormData();
+            $form['id'] = generateUuid4();
+            $errors = validateGastoForm($form);
+
+            if (!empty($errors)) {
+                Flash::setOld($form);
+                Flash::setErrors($errors);
+                Flash::setMessage('Corrige los errores del formulario de gasto.');
+                View::redirect('gastos.create');
+            }
+
+            $request = new CreateGastoWebRequest(
+                $form['id'],
+                $form['fecha'],
+                $form['valorTotalSinIVA'],
+                $form['ivaTotal'],
+                $form['valorTotalConIVA'],
+                $form['nombreUsuario'],
+                $form['lugar'],
+                $form['descripcion']
+            );
+
+            $gastoController->store($request);
+
+            Flash::setSuccess('Gasto registrado correctamente.');
+            View::redirect('gastos.index');
+            break;
+
+        case 'gastos.index':
+            $gastoController = DependencyInjection::getGastoController();
+            $nombreUsuario = isset($_GET['nombreUsuario']) ? trim((string) $_GET['nombreUsuario']) : null;
+            $fechaDesde = isset($_GET['fechaDesde']) ? trim((string) $_GET['fechaDesde']) : null;
+            $fechaHasta = isset($_GET['fechaHasta']) ? trim((string) $_GET['fechaHasta']) : null;
+            $gastos = $gastoController->index($nombreUsuario, $fechaDesde, $fechaHasta);
+            View::render('gastos/list', buildListGastosViewData($gastos, array(
+                'nombreUsuario' => (string) ($nombreUsuario ?? ''),
+                'fechaDesde' => (string) ($fechaDesde ?? ''),
+                'fechaHasta' => (string) ($fechaHasta ?? ''),
+            )));
+            break;
+
+        case 'gastos.show':
+            $gastoController = DependencyInjection::getGastoController();
+            $id = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+            $gasto = $gastoController->show($id);
+            View::render('gastos/show', array(
+                'pageTitle' => 'Detalle de gasto',
+                'gasto' => $gasto,
+                'message' => Flash::message(),
+            ));
+            break;
+
+        case 'gastos.edit':
+            $gastoController = DependencyInjection::getGastoController();
+            $id = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+            $gasto = $gastoController->show($id);
+            View::render('gastos/edit', array(
+                'pageTitle' => 'Editar gasto',
+                'gasto' => $gasto,
+                'message' => Flash::message(),
+                'errors' => Flash::errors(),
+                'old' => Flash::old(),
+            ));
+            break;
+
+        case 'gastos.update':
+            $gastoController = DependencyInjection::getGastoController();
+            $form = getGastoFormData(true);
+            $errors = validateGastoForm($form);
+
+            if (!empty($errors)) {
+                Flash::setOld($form);
+                Flash::setErrors($errors);
+                Flash::setMessage('Corrige los errores del formulario de gasto.');
+                header('Location: ?route=gastos.edit&id=' . urlencode($form['id']));
+                exit;
+            }
+
+            $request = new UpdateGastoWebRequest(
+                $form['id'],
+                $form['fecha'],
+                $form['valorTotalSinIVA'],
+                $form['ivaTotal'],
+                $form['valorTotalConIVA'],
+                $form['nombreUsuario'],
+                $form['lugar'],
+                $form['descripcion']
+            );
+
+            $gastoController->update($request);
+
+            Flash::setSuccess('Gasto actualizado correctamente.');
+            View::redirect('gastos.index');
+            break;
+
+        case 'gastos.delete':
+            $gastoController = DependencyInjection::getGastoController();
+            $id = isset($_POST['id']) ? trim((string) $_POST['id']) : '';
+            $gastoController->delete($id);
+            Flash::setSuccess('Gasto eliminado correctamente.');
+            View::redirect('gastos.index');
+            break;
+
+        // ── Autenticación y Recuperación ──
         case 'login':
             if (isLoggedIn()) {
                 View::redirect('home');
@@ -232,7 +397,6 @@ try {
             header('Location: ?route=auth.login');
             exit;
 
-
         case 'forgot':
             View::render('auth/forgot-password', array(
                 'pageTitle' => 'Recuperar contraseña',
@@ -254,27 +418,83 @@ try {
 
             $repository = DependencyInjection::getUserRepository();
             $foundUser = $repository->getByEmail(new UserEmail($forgotEmail));
+            $channelUsed = 'none';
 
-            // Always show generic success to avoid user enumeration.
             if ($foundUser !== null && $foundUser->status() === UserStatusEnum::ACTIVE) {
-                // Generate a secure temporary password (10 hex chars ≥ 8 chars).
                 $tempPassword = bin2hex(random_bytes(5));
                 $newPassword = UserPassword::fromPlainText($tempPassword);
                 $updatedUser = $foundUser->changePassword($newPassword);
-                $repository->update($updatedUser);
 
-                sendPasswordRecoveryEmail(
+                $channelUsed = sendPasswordRecoveryEmail(
                     $foundUser->email()->value(),
                     $foundUser->name()->value(),
                     $tempPassword
                 );
+
+                $repository->update($updatedUser);
             }
 
-            Flash::setSuccess(
-                'Si el correo está registrado y la cuenta está activa, ' .
-                'recibirás un mensaje con tu contraseña temporal.'
-            );
+            if ($channelUsed === 'outbox') {
+                Flash::setSuccess(
+                    'Solicitud procesada correctamente. (Nota Cloud Free: si el proveedor bloquea puertos SMTP 587/465 como en Render Free, el correo HTML quedó registrado en "Bandeja correos" del panel administrativo o configure BREVO_API_KEY / RESEND_API_KEY por HTTPS 443).'
+                );
+            } else {
+                Flash::setSuccess(
+                    'Si el correo está registrado y la cuenta está activa, recibirás un mensaje con tu contraseña temporal.'
+                );
+            }
             View::redirect('auth.forgot');
+            break;
+
+        case 'emails.outbox':
+            $messages = DependencyInjection::getEmailSenderService()->listOutboxMessages(25);
+            View::render('emails/outbox', array(
+                'pageTitle' => 'Bandeja de salida de correos',
+                'messages' => $messages,
+            ));
+            break;
+
+        case 'smtp.config':
+            $logged = getLoggedUser();
+            if (($logged['role'] ?? '') !== UserRoleEnum::ADMIN) {
+                Flash::setMessage('Solo un Administrador puede editar la configuración SMTP.');
+                View::redirect('home');
+            }
+            View::render('emails/smtp-config', array(
+                'pageTitle' => 'Configuración SMTP',
+                'smtp' => DependencyInjection::resolveEffectiveSmtpSettings(),
+                'message' => Flash::message(),
+                'success' => Flash::success(),
+            ));
+            break;
+
+        case 'smtp.save':
+            $logged = getLoggedUser();
+            if (($logged['role'] ?? '') !== UserRoleEnum::ADMIN) {
+                Flash::setMessage('Solo un Administrador puede editar la configuración SMTP.');
+                View::redirect('home');
+            }
+            $smtpRepo = DependencyInjection::getSmtpConfigRepository();
+            if ($smtpRepo === null) {
+                Flash::setMessage('La tabla configuracion_smtp requiere almacenamiento MySQL activo.');
+                View::redirect('smtp.config');
+            }
+
+            $host = trim((string) ($_POST['host'] ?? ''));
+            $port = (int) ($_POST['port'] ?? 587);
+            $username = trim((string) ($_POST['username'] ?? ''));
+            $password = (string) ($_POST['password'] ?? '');
+            $remitente = trim((string) ($_POST['remitente'] ?? ''));
+
+            if ($host === '' || $port <= 0 || !filter_var($username, FILTER_VALIDATE_EMAIL)) {
+                Flash::setMessage('Verifica servidor SMTP, puerto válido y correo autenticado.');
+                View::redirect('smtp.config');
+            }
+
+            $smtpRepo->saveConfig($host, $port, $username, $password, $remitente);
+            DependencyInjection::invalidateEmailSender();
+            Flash::setSuccess('Configuración SMTP actualizada correctamente en la base de datos.');
+            View::redirect('smtp.config');
             break;
 
         default:
@@ -296,6 +516,23 @@ try {
             header('Location: ?route=users.edit&id=' . urlencode($updateId));
             exit;
 
+        case 'gastos.store':
+            Flash::setOld(getGastoFormData());
+            View::redirect('gastos.create');
+            break;
+
+        case 'gastos.update':
+            $updateGastoId = trim((string) ($_POST['id'] ?? ''));
+            Flash::setOld(getGastoFormData(true));
+            header('Location: ?route=gastos.edit&id=' . urlencode($updateGastoId));
+            exit;
+
+        case 'gastos.show':
+        case 'gastos.edit':
+        case 'gastos.delete':
+            View::redirect('gastos.index');
+            break;
+
         case 'auth.authenticate':
             Flash::setOld(array('email' => trim(strtolower((string) ($_POST['email'] ?? '')))));
             View::redirect('auth.login');
@@ -308,11 +545,7 @@ try {
 
         case 'users.show':
         case 'users.edit':
-            View::redirect('users.index');
-            break;
-
         case 'users.delete':
-            Flash::setMessage($msg);
             View::redirect('users.index');
             break;
 
@@ -322,8 +555,160 @@ try {
     }
 }
 
+// ──────────────────────────────────────────────────────────────
+// Despachador API RESTful y Swagger OpenAPI
+// ──────────────────────────────────────────────────────────────
 
-function sendPasswordRecoveryEmail(string $email, string $name, string $tempPassword): void
+function dispatchRestApi(string $apiPath): never
+{
+    ClassLoader::loadClass('ApiRequest');
+    ClassLoader::loadClass('ApiResponse');
+    ClassLoader::loadClass('ErrorHandler');
+
+    $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if ($method === 'OPTIONS') {
+        (new ApiResponse(204, array()))->send();
+        exit;
+    }
+
+    try {
+        $request = ApiRequest::fromGlobals($apiPath);
+        $trimmed = rtrim($apiPath, '/');
+
+        if ($trimmed === '/api/health' && $method === 'GET') {
+            ApiResponse::success(array(
+                'service' => 'users-gastos-hexagonal-ddd-cqrs',
+                'php_version' => PHP_VERSION,
+                'storage_driver' => DependencyInjection::getActiveStorageDriver(),
+                'entities' => array('Usuario', 'Gasto'),
+                'timestamp' => date('c'),
+            ))->send();
+            exit;
+        }
+
+        if ($trimmed === '/api/tax-indicators' && $method === 'GET') {
+            $indicators = DependencyInjection::getTaxIndicatorRestPort()->fetchCurrentTaxIndicators();
+            ApiResponse::success($indicators)->send();
+            exit;
+        }
+
+        if ($trimmed === '/api/auth/login' && $method === 'POST') {
+            DependencyInjection::getUserRestController()->login($request)->send();
+            exit;
+        }
+
+        if ($trimmed === '/api/users') {
+            $ctrl = DependencyInjection::getUserRestController();
+            if ($method === 'GET') {
+                $ctrl->list()->send();
+                exit;
+            }
+            if ($method === 'POST') {
+                $ctrl->create($request, generateUuid4())->send();
+                exit;
+            }
+            ApiResponse::error('MethodNotAllowed', 'Método no permitido en /api/users', 405)->send();
+            exit;
+        }
+
+        if (preg_match('#^/api/users/([^/]+)$#', $trimmed, $m)) {
+            $id = urldecode($m[1]);
+            $ctrl = DependencyInjection::getUserRestController();
+            if ($method === 'GET') {
+                $ctrl->getById($id)->send();
+                exit;
+            }
+            if ($method === 'PUT' || $method === 'PATCH') {
+                $ctrl->update($request, $id)->send();
+                exit;
+            }
+            if ($method === 'DELETE') {
+                $ctrl->delete($id)->send();
+                exit;
+            }
+            ApiResponse::error('MethodNotAllowed', 'Método no permitido en /api/users/{id}', 405)->send();
+            exit;
+        }
+
+        if ($trimmed === '/api/gastos') {
+            $ctrl = DependencyInjection::getGastoRestController();
+            if ($method === 'GET') {
+                $ctrl->list($request)->send();
+                exit;
+            }
+            if ($method === 'POST') {
+                $ctrl->create($request, generateUuid4())->send();
+                exit;
+            }
+            ApiResponse::error('MethodNotAllowed', 'Método no permitido en /api/gastos', 405)->send();
+            exit;
+        }
+
+        if (preg_match('#^/api/gastos/([^/]+)$#', $trimmed, $m)) {
+            $id = urldecode($m[1]);
+            $ctrl = DependencyInjection::getGastoRestController();
+            if ($method === 'GET') {
+                $ctrl->getById($id)->send();
+                exit;
+            }
+            if ($method === 'PUT' || $method === 'PATCH') {
+                $ctrl->update($request, $id)->send();
+                exit;
+            }
+            if ($method === 'DELETE') {
+                $ctrl->delete($id)->send();
+                exit;
+            }
+            ApiResponse::error('MethodNotAllowed', 'Método no permitido en /api/gastos/{id}', 405)->send();
+            exit;
+        }
+
+        ApiResponse::error('RouteNotFound', 'Endpoint API no encontrado: ' . $apiPath, 404)->send();
+    } catch (Throwable $e) {
+        ErrorHandler::handle($e)->send();
+    }
+    exit;
+}
+
+function serveOpenApiSpec(): never
+{
+    $specFile = __DIR__ . '/../Infrastructure/Entrypoints/Rest/Swagger/openapi.json';
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Access-Control-Allow-Origin: *');
+    readfile($specFile);
+    exit;
+}
+
+function serveSwaggerUi(): never
+{
+    header('Content-Type: text/html; charset=UTF-8');
+    echo <<<'HTML'
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Swagger UI — CRUD Usuarios y Gastos (#6)</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        window.onload = function () {
+            SwaggerUIBundle({
+                url: '?route=openapi',
+                dom_id: '#swagger-ui',
+                deepLinking: true
+            });
+        };
+    </script>
+</body>
+</html>
+HTML;
+    exit;
+}
+
+function sendPasswordRecoveryEmail(string $email, string $name, string $tempPassword): string
 {
     $templateFile = __DIR__ . '/../Infrastructure/Entrypoints/Web/Presentation/Views/emails/forgot-password.php';
 
@@ -341,9 +726,11 @@ function sendPasswordRecoveryEmail(string $email, string $name, string $tempPass
         $htmlBody
     );
 
-    DependencyInjection::getEmailSenderService()->send($destination);
-}
+    $sender = DependencyInjection::getEmailSenderService();
+    $sender->send($destination);
 
+    return $sender->getLastDeliveryChannel();
+}
 
 /**
  * @param UserResponse[] $users
@@ -360,13 +747,44 @@ function buildListUsersViewData(array $users): array
 }
 
 /**
+ * @param GastoResponse[] $gastos
+ * @param array<string, string> $filters
+ * @return array<string, mixed>
+ */
+function buildListGastosViewData(array $gastos, array $filters): array
+{
+    $sinIva = 0.0;
+    $iva = 0.0;
+    $conIva = 0.0;
+
+    foreach ($gastos as $g) {
+        $sinIva += $g->getValorTotalSinIVA();
+        $iva += $g->getIvaTotal();
+        $conIva += $g->getValorTotalConIVA();
+    }
+
+    return array(
+        'pageTitle' => 'Lista de gastos',
+        'gastos' => $gastos,
+        'filters' => $filters,
+        'totals' => array(
+            'sinIva' => $sinIva,
+            'iva' => $iva,
+            'conIva' => $conIva,
+        ),
+        'message' => Flash::message(),
+        'success' => Flash::success(),
+    );
+}
+
+/**
  * @return array<string, mixed>
  */
 function buildHomeViewData(string $message = ''): array
 {
     return array(
         'pageTitle' => 'Menú principal',
-        'message' => $message,
+        'message' => $message !== '' ? $message : Flash::message(),
         'success' => Flash::success(),
     );
 }
@@ -379,6 +797,25 @@ function buildCreateUserViewData(): array
     return array(
         'pageTitle' => 'Registrar usuario',
         'roleOptions' => UserRoleEnum::values(),
+        'message' => Flash::message(),
+        'success' => Flash::success(),
+        'errors' => Flash::errors(),
+        'old' => Flash::old(),
+    );
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function buildCreateGastoViewData(): array
+{
+    $logged = getLoggedUser();
+    $users = DependencyInjection::getUserController()->index();
+
+    return array(
+        'pageTitle' => 'Registrar gasto',
+        'defaultUserName' => (string) ($logged['name'] ?? 'Administrador'),
+        'registeredUsers' => $users,
         'message' => Flash::message(),
         'success' => Flash::success(),
         'errors' => Flash::errors(),
@@ -402,7 +839,6 @@ function buildEditUserViewData(UserResponse $user): array
     );
 }
 
-
 function generateUuid4(): string
 {
     $data = random_bytes(16);
@@ -411,7 +847,6 @@ function generateUuid4(): string
 
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
-
 
 /**
  * @return array<string, string>
@@ -441,6 +876,27 @@ function getUpdateUserFormData(): array
     );
 }
 
+/**
+ * @return array<string, string>
+ */
+function getGastoFormData(bool $includeId = false): array
+{
+    $data = array(
+        'fecha' => isset($_POST['fecha']) ? trim((string) $_POST['fecha']) : '',
+        'valorTotalSinIVA' => isset($_POST['valorTotalSinIVA']) ? trim((string) $_POST['valorTotalSinIVA']) : '',
+        'ivaTotal' => isset($_POST['ivaTotal']) ? trim((string) $_POST['ivaTotal']) : '',
+        'valorTotalConIVA' => isset($_POST['valorTotalConIVA']) ? trim((string) $_POST['valorTotalConIVA']) : '',
+        'nombreUsuario' => isset($_POST['nombreUsuario']) ? trim((string) $_POST['nombreUsuario']) : '',
+        'lugar' => isset($_POST['lugar']) ? trim((string) $_POST['lugar']) : '',
+        'descripcion' => isset($_POST['descripcion']) ? trim((string) $_POST['descripcion']) : '',
+    );
+
+    if ($includeId) {
+        $data['id'] = isset($_POST['id']) ? trim((string) $_POST['id']) : '';
+    }
+
+    return $data;
+}
 
 /**
  * @param array<string, string> $form
@@ -491,7 +947,6 @@ function validateUpdateUserForm(array $form): array
         $errors['email'] = 'El correo no tiene un formato válido.';
     }
 
-    // Password is optional on update; validate only if provided.
     if ($form['password'] !== '' && strlen($form['password']) < 8) {
         $errors['password'] = 'La contraseña debe tener al menos 8 caracteres si deseas cambiarla.';
     }
@@ -502,6 +957,45 @@ function validateUpdateUserForm(array $form): array
 
     if ($form['status'] === '') {
         $errors['status'] = 'El estado es obligatorio.';
+    }
+
+    return $errors;
+}
+
+/**
+ * @param array<string, string> $form
+ * @return array<string, string>
+ */
+function validateGastoForm(array $form): array
+{
+    $errors = array();
+
+    if ($form['fecha'] === '') {
+        $errors['fecha'] = 'La fecha del gasto es obligatoria.';
+    }
+
+    if ($form['valorTotalSinIVA'] === '' || !is_numeric($form['valorTotalSinIVA']) || (float) $form['valorTotalSinIVA'] <= 0) {
+        $errors['valorTotalSinIVA'] = 'El valor total sin IVA debe ser numérico y mayor que cero.';
+    }
+
+    if ($form['ivaTotal'] === '' || !is_numeric($form['ivaTotal']) || (float) $form['ivaTotal'] < 0) {
+        $errors['ivaTotal'] = 'El IVA total debe ser numérico y mayor o igual a cero.';
+    }
+
+    if ($form['valorTotalConIVA'] === '' || !is_numeric($form['valorTotalConIVA']) || (float) $form['valorTotalConIVA'] <= 0) {
+        $errors['valorTotalConIVA'] = 'El valor total con IVA debe ser numérico y mayor que cero.';
+    }
+
+    if (mb_strlen($form['nombreUsuario']) < 3) {
+        $errors['nombreUsuario'] = 'El nombre del usuario debe tener al menos 3 caracteres.';
+    }
+
+    if (mb_strlen($form['lugar']) < 3) {
+        $errors['lugar'] = 'El lugar debe tener al menos 3 caracteres.';
+    }
+
+    if (mb_strlen($form['descripcion']) < 5) {
+        $errors['descripcion'] = 'La descripción debe tener al menos 5 caracteres.';
     }
 
     return $errors;

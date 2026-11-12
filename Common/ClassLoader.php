@@ -136,16 +136,29 @@ final class ClassLoader
         'FileQueueEventPublisherAdapter' => 'Infrastructure/Adapters/Queue/FileQueueEventPublisherAdapter.php',
         'TaxIndicatorRestAdapter' => 'Infrastructure/Adapters/Rest/TaxIndicatorRestAdapter.php',
 
-        // Entrypoints Web
+        // Entrypoints Web — Usuario + Gasto (#6)
         'CreateUserWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/CreateUserRequest.php',
         'UpdateUserWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/UpdateUserRequest.php',
         'LoginWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/LoginWebRequest.php',
         'UserResponse' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/UserResponse.php',
         'UserWebMapper' => 'Infrastructure/Entrypoints/Web/Controllers/Mapper/UserWebMapper.php',
         'UserController' => 'Infrastructure/Entrypoints/Web/Controllers/UserController.php',
+        'CreateGastoWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/CreateGastoRequest.php',
+        'UpdateGastoWebRequest' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/UpdateGastoRequest.php',
+        'GastoResponse' => 'Infrastructure/Entrypoints/Web/Controllers/Dto/GastoResponse.php',
+        'GastoWebMapper' => 'Infrastructure/Entrypoints/Web/Controllers/Mapper/GastoWebMapper.php',
+        'GastoController' => 'Infrastructure/Entrypoints/Web/Controllers/GastoController.php',
         'WebRoutes' => 'Infrastructure/Entrypoints/Web/Controllers/Config/WebRoutes.php',
         'View' => 'Infrastructure/Entrypoints/Web/Presentation/View.php',
         'Flash' => 'Infrastructure/Entrypoints/Web/Presentation/Flash.php',
+
+        // Entrypoints REST + ErrorHandler
+        'ApiRequest' => 'Infrastructure/Entrypoints/Rest/Dto/ApiRequest.php',
+        'ApiResponse' => 'Infrastructure/Entrypoints/Rest/Dto/ApiResponse.php',
+        'RestApiMapper' => 'Infrastructure/Entrypoints/Rest/Mapper/RestApiMapper.php',
+        'ErrorHandler' => 'Infrastructure/Entrypoints/Rest/ErrorHandler.php',
+        'UserRestController' => 'Infrastructure/Entrypoints/Rest/UserRestController.php',
+        'GastoRestController' => 'Infrastructure/Entrypoints/Rest/GastoRestController.php',
 
         'DependencyInjection' => 'Common/DependencyInjection.php',
     );

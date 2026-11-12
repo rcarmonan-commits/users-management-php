@@ -1,0 +1,255 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API Hexagonal DDD & CQRS — Usuarios y Gastos (#6)",
+    "version": "1.0.0",
+    "description": "Especificación OpenAPI 3.0.3 para el CRUDL de la entidad común Usuario y la entidad asignada #6 Gasto en PHP 8.3 siguiendo Arquitectura Hexagonal, DDD y CQRS.",
+    "contact": {
+      "name": "Rosary Eilyn Carmona Navarro",
+      "email": "rcarmonan@unicartagena.edu.co"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Servidor activo"
+    }
+  ],
+  "tags": [
+    { "name": "Sistema", "description": "Diagnóstico y parámetros tributarios" },
+    { "name": "Auth", "description": "Autenticación de usuarios" },
+    { "name": "Usuarios", "description": "CRUDL de la entidad común Usuario" },
+    { "name": "Gastos", "description": "CRUDL de la entidad asignada #6 Gasto" }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Estado operativo de la aplicación y adaptador activo",
+        "responses": {
+          "200": { "description": "Servicio saludable" }
+        }
+      }
+    },
+    "/api/tax-indicators": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Indicadores tributarios vigentes obtenidos por TaxIndicatorRestPort",
+        "responses": {
+          "200": { "description": "Indicadores IVA y UVT" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Autenticar credenciales de usuario",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "admin@crud.com" },
+                  "password": { "type": "string", "example": "Admin12345" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Credenciales válidas" },
+          "401": { "description": "Credenciales inválidas o cuenta inactiva" }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Listar todos los usuarios (Query)",
+        "responses": { "200": { "description": "Listado de usuarios" } }
+      },
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Crear un nuevo usuario (Command)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUserInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Usuario creado" },
+          "409": { "description": "Correo duplicado" },
+          "422": { "description": "Regla de dominio violada" }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Consultar usuario por ID (Query)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detalle del usuario" },
+          "404": { "description": "Usuario no encontrado" }
+        }
+      },
+      "put": {
+        "tags": ["Usuarios"],
+        "summary": "Actualizar usuario existente (Command)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateUserInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Usuario actualizado" },
+          "404": { "description": "Usuario no encontrado" },
+          "422": { "description": "Regla de dominio violada" }
+        }
+      },
+      "delete": {
+        "tags": ["Usuarios"],
+        "summary": "Eliminar usuario por ID (Command)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Usuario eliminado" },
+          "404": { "description": "Usuario no encontrado" }
+        }
+      }
+    },
+    "/api/gastos": {
+      "get": {
+        "tags": ["Gastos"],
+        "summary": "Listar gastos con filtros opcionales y totales acumulados (Query)",
+        "parameters": [
+          { "name": "nombreUsuario", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "fechaDesde", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } },
+          { "name": "fechaHasta", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "Listado y sumatoria de gastos" } }
+      },
+      "post": {
+        "tags": ["Gastos"],
+        "summary": "Registrar un nuevo gasto validando invariante de IVA (Command)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GastoInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Gasto registrado" },
+          "422": { "description": "Inconsistencia contable de IVA o datos inválidos" }
+        }
+      }
+    },
+    "/api/gastos/{id}": {
+      "get": {
+        "tags": ["Gastos"],
+        "summary": "Consultar un gasto por ID (Query)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detalle del gasto" },
+          "404": { "description": "Gasto no encontrado" }
+        }
+      },
+      "put": {
+        "tags": ["Gastos"],
+        "summary": "Actualizar un gasto existente (Command)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GastoInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Gasto actualizado" },
+          "404": { "description": "Gasto no encontrado" },
+          "422": { "description": "Inconsistencia contable de IVA o datos inválidos" }
+        }
+      },
+      "delete": {
+        "tags": ["Gastos"],
+        "summary": "Eliminar un gasto por ID (Command)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Gasto eliminado" },
+          "404": { "description": "Gasto no encontrado" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateUserInput": {
+        "type": "object",
+        "required": ["name", "email", "password", "role"],
+        "properties": {
+          "name": { "type": "string", "example": "Rosary Carmona" },
+          "email": { "type": "string", "example": "rcarmonan@unicartagena.edu.co" },
+          "password": { "type": "string", "example": "ClaveSegura2026" },
+          "role": { "type": "string", "enum": ["ADMIN", "MEMBER", "REVIEWER"], "example": "ADMIN" }
+        }
+      },
+      "UpdateUserInput": {
+        "type": "object",
+        "required": ["name", "email", "role", "status"],
+        "properties": {
+          "name": { "type": "string", "example": "Rosary Eilyn Carmona" },
+          "email": { "type": "string", "example": "rcarmonan@unicartagena.edu.co" },
+          "password": { "type": "string", "example": "" },
+          "role": { "type": "string", "enum": ["ADMIN", "MEMBER", "REVIEWER"], "example": "ADMIN" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "PENDING", "BLOCKED"], "example": "ACTIVE" }
+        }
+      },
+      "GastoInput": {
+        "type": "object",
+        "required": [
+          "fecha",
+          "valorTotalSinIVA",
+          "ivaTotal",
+          "valorTotalConIVA",
+          "nombreUsuario",
+          "lugar",
+          "descripcion"
+        ],
+        "properties": {
+          "fecha": { "type": "string", "format": "date", "example": "2026-10-15" },
+          "valorTotalSinIVA": { "type": "number", "example": 150000 },
+          "ivaTotal": { "type": "number", "example": 28500 },
+          "valorTotalConIVA": { "type": "number", "example": 178500 },
+          "nombreUsuario": { "type": "string", "example": "Administrador" },
+          "lugar": { "type": "string", "example": "Librería Nacional Cartagena" },
+          "descripcion": { "type": "string", "example": "Adquisición de bibliografía de arquitectura de software" }
+        }
+      }
+    }
+  }
+}
