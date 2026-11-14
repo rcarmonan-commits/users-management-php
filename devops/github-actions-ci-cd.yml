@@ -1,0 +1,68 @@
+name: CI/CD — Arquitectura Hexagonal PHP 8.3 (Usuarios + Gastos #6)
+
+on:
+  push:
+    branches: [ main, "feature/**", "fix/**", "security/**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality-and-tests:
+    name: Lint PHP 8.3 + Migración MySQL 8 + Suite Hexagonal DDD/CQRS
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: crud_usuarios
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+
+    steps:
+      - name: Checkout del repositorio Fork
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP 8.3 con PDO MySQL
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, pdo, pdo_mysql
+          coverage: none
+
+      - name: Verificar sintaxis estricta en todos los archivos PHP
+        run: find Domain Application Infrastructure Common public tests -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Ejecutar migración base de datos MySQL (database.sql)
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot_password < Infrastructure/Adapters/Persistence/MySQL/Database/mysql/database.sql
+
+      - name: Ejecutar suite automatizada de pruebas de Dominio, Aplicación, Adaptadores y Entrypoints
+        env:
+          DB_DRIVER: memory
+        run: php tests/run_tests.php
+
+      - name: Verificar construcción de imagen Docker productiva
+        run: docker build -t users-gastos-hexagonal-php:ci .
+
+  deploy-cloud:
+    name: Despliegue Continuo en Cloud (Render Webhook)
+    needs: quality-and-tests
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar webhook de despliegue si RENDER_DEPLOY_HOOK_URL está configurado
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            curl -fsSL -X POST "$RENDER_DEPLOY_HOOK_URL"
+            echo "Despliegue en Render iniciado correctamente."
+          else
+            echo "RENDER_DEPLOY_HOOK_URL no definido en Secrets; despliegue gestionado por autoDeploy de render.yaml."
+          fi

@@ -1,0 +1,250 @@
+{
+  "info": {
+    "_postman_id": "6f8a92c1-4d7e-4b3a-9c61-060606060606",
+    "name": "CRUD Usuarios + Ejercicio #6 Gasto — Hexagonal DDD CQRS PHP (Protegido con JWT HS256)",
+    "description": "Colección oficial end-to-end protegida con autenticación Bearer JWT (HS256) y RBAC para la entidad común Usuario y la entidad asignada #6 Gasto.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{jwtToken}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "jwtToken", "value": "" },
+    { "key": "createdUserId", "value": "" },
+    { "key": "createdGastoId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Diagnóstico y Seguridad Anti-Vulneración JWT",
+      "item": [
+        {
+          "name": "Health Check Público",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Success true', () => pm.expect(body.success).to.eql(true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prueba OWASP: Bloqueo de Acceso sin Token JWT (401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rechaza petición anónima sin token con HTTP 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Administrador Base (Emite y Guarda Bearer JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login exitoso 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.access_token) { pm.collectionVariables.set('jwtToken', json.data.access_token); }",
+                  "pm.test('Retorna token JWT Bearer', () => pm.expect(json.data.token_type).to.eql('Bearer'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@crud.com\",\n  \"password\": \"Admin12345\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Indicadores Tributarios (Adaptador REST con Token JWT)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tax-indicators"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Entidad Común Usuario (CRUDL Protegido JWT + RBAC)",
+      "item": [
+        {
+          "name": "Crear Usuario (Command)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Usuario creado 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) { pm.collectionVariables.set('createdUserId', json.data.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rosary Carmona\",\n  \"email\": \"rcarmonan@unicartagena.edu.co\",\n  \"password\": \"Cartagena2026\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "Listar Usuarios (Query)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "Consultar Usuario por ID (Query)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          }
+        },
+        {
+          "name": "Actualizar Usuario sin cambiar clave (Command)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rosary Eilyn Carmona Navarro\",\n  \"email\": \"rcarmonan@unicartagena.edu.co\",\n  \"password\": \"\",\n  \"role\": \"ADMIN\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          }
+        },
+        {
+          "name": "Eliminar Usuario (Command)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Ejercicio #6 — Entidad Gasto (CRUDL + Reglas DDD)",
+      "item": [
+        {
+          "name": "Crear Gasto Válido (Command)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Gasto creado 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.id) { pm.collectionVariables.set('createdGastoId', json.data.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-10-20\",\n  \"valorTotalSinIVA\": 200000,\n  \"ivaTotal\": 38000,\n  \"valorTotalConIVA\": 238000,\n  \"nombreUsuario\": \"Administrador\",\n  \"lugar\": \"Ferretería El Constructor Cartagena\",\n  \"descripcion\": \"Compra de cableado estructurado categoría 6A para laboratorio\"\n}"
+            },
+            "url": "{{baseUrl}}/api/gastos"
+          }
+        },
+        {
+          "name": "Validar Invariante Contable IVA Inválido (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rechaza inconsistencia de IVA con 422', () => pm.response.to.have.status(422));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-10-20\",\n  \"valorTotalSinIVA\": 100000,\n  \"ivaTotal\": 19000,\n  \"valorTotalConIVA\": 150000,\n  \"nombreUsuario\": \"Administrador\",\n  \"lugar\": \"Almacén Éxito\",\n  \"descripcion\": \"Intento con suma de IVA inconsistente\"\n}"
+            },
+            "url": "{{baseUrl}}/api/gastos"
+          }
+        },
+        {
+          "name": "Listar Gastos y Sumatorias (Query)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/gastos"
+          }
+        },
+        {
+          "name": "Consultar Gasto por ID (Query)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/gastos/{{createdGastoId}}"
+          }
+        },
+        {
+          "name": "Actualizar Gasto (Command)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-10-22\",\n  \"valorTotalSinIVA\": 300000,\n  \"ivaTotal\": 57000,\n  \"valorTotalConIVA\": 357000,\n  \"nombreUsuario\": \"Administrador\",\n  \"lugar\": \"Ferretería El Constructor Cartagena\",\n  \"descripcion\": \"Compra ampliada de cableado estructurado y conectores RJ45\"\n}"
+            },
+            "url": "{{baseUrl}}/api/gastos/{{createdGastoId}}"
+          }
+        },
+        {
+          "name": "Eliminar Gasto (Command)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/gastos/{{createdGastoId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
