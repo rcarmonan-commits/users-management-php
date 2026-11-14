@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: users-gastos-hexagonal-php
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DB_DRIVER
+        value: auto
+      - key: SMTP_STRICT
+        value: "false"
+      - key: CACHE_TTL_SECONDS
+        value: "120"
+      - key: JWT_TTL_SECONDS
+        value: "3600"
