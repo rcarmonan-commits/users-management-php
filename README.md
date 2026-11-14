@@ -9,7 +9,7 @@ Repositorio desarrollado a partir del **Fork oficial** de [`arrietajohn/hexagona
 | Campo | Detalle Institucional |
 |---|---|
 | **Universidad** | Universidad de Cartagena |
-| **Programa Académico** | Ingeniería de Sistemas |
+| **Programa Académico** | Ingeniería de Software |
 | **Asignatura** | Desarrollo Web — Unidad 2 |
 | **Semestre** | 2026-I |
 | **Actividad** | Guía de Desarrollo: CRUD de Usuarios con Arquitectura Hexagonal, DDD y CQRS en PHP |
