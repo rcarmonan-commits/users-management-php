@@ -632,3 +632,217 @@ table.detail-table th {
     justify-content: space-between;
     gap: 10px;
 }
+
+/* ── Webhook Guide Card & Contrast Preservation ── */
+.webhook-guide-card {
+    background: #090e1a !important;
+    border: 1px solid #1e293b !important;
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-bottom: 22px;
+    color: #f1f5f9 !important;
+    color-scheme: dark;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.webhook-guide-card summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #38bdf8 !important;
+    font-size: 1.02rem;
+    margin-bottom: 14px;
+    user-select: none;
+}
+
+.webhook-guide-card summary:hover {
+    color: #7dd3fc !important;
+}
+
+.guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 16px 0;
+}
+
+.guide-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    color: #e2e8f0 !important;
+    font-size: 0.93rem;
+    line-height: 1.55;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #0284c7;
+    color: #ffffff !important;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.guide-step-body {
+    flex: 1;
+    color: #e2e8f0 !important;
+}
+
+.guide-step-body strong {
+    color: #f8fafc !important;
+}
+
+.code-container-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    color: #94a3b8;
+}
+
+.copy-script-btn {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #38bdf8;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.copy-script-btn:hover {
+    background: #334155;
+    color: #ffffff;
+}
+
+.guide-pre {
+    background: #020617 !important;
+    color: #f8fafc !important;
+    padding: 14px 16px;
+    border-radius: 0 0 8px 8px;
+    border: 1px solid #334155 !important;
+    overflow-x: auto;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    margin: 0 0 14px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.guide-note-box {
+    margin-top: 14px;
+    padding: 12px 16px;
+    background: rgba(14, 165, 233, 0.1) !important;
+    border-left: 4px solid #38bdf8 !important;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    color: #bae6fd !important;
+    line-height: 1.55;
+}
+
+.guide-note-box strong {
+    color: #e0f2fe !important;
+}
+
+/* ── Active CQRS Filter Chips & Unified Controls ── */
+.filter-chips-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-md);
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.filter-chip strong {
+    color: #ffffff;
+}
+
+.filter-chip-remove {
+    color: #93c5fd;
+    text-decoration: none !important;
+    font-weight: 700;
+    margin-left: 2px;
+    padding: 0 4px;
+    border-radius: 50%;
+}
+
+.filter-chip-remove:hover {
+    background: rgba(239, 68, 68, 0.4);
+    color: #ffffff;
+}
+
+.filter-clear-all {
+    margin-left: auto;
+    font-size: 0.82rem;
+    color: #fca5a5;
+    text-decoration: underline;
+}
+
+.filter-clear-all:hover {
+    color: #ffffff;
+}
+
+/* ── Print Styles for Reports ── */
+@media print {
+    nav.top-nav,
+    .top-banner,
+    .header-actions,
+    .filter-bar,
+    .filter-chips-bar,
+    .btn,
+    .app-footer {
+        display: none !important;
+    }
+
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .card-panel,
+    .kpi-card,
+    .table-wrap {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #cccccc !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+
+    table th {
+        background: #f1f5f9 !important;
+        color: #000000 !important;
+    }
+
+    table td {
+        color: #000000 !important;
+    }
+}

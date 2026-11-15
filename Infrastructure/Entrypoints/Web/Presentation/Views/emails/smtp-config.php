@@ -88,66 +88,211 @@ require __DIR__ . '/../layouts/menu.php';
         <strong><?= !empty($relay['has_active_relay']) ? 'ACTIVA (HTTPS 443)' : 'NO CONFIGURADA (usando SMTP directo / Outbox)' ?></strong>.
     </p>
 
-    <details open style="margin-bottom: 20px; padding: 16px 18px; border: 1px solid #334155; border-radius: 10px; background: #0f172a; color: #cbd5e1;">
-        <summary style="cursor: pointer; font-weight: 700; color: #38bdf8; font-size: 1rem; margin-bottom: 12px; user-select: none;">
-            Guía rápida (100% gratis con tu propio Gmail): Crear Webhook Google Apps Script por HTTPS 443
+    <details open class="webhook-guide-card" style="margin-bottom: 24px; padding: 20px 22px; border: 1px solid #334155 !important; border-radius: 12px; background: #090e1a !important; color: #f1f5f9 !important; color-scheme: dark;">
+        <summary style="cursor: pointer; font-weight: 700; color: #38bdf8 !important; font-size: 1.05rem; margin-bottom: 14px; user-select: none;">
+            Guía de Configuración Rápida (100% gratis con tu propio Gmail): Pasarela Webhook HTTPS 443
         </summary>
-        <div style="color: #cbd5e1; font-size: 0.92rem; line-height: 1.6;">
-            <ol style="margin: 0 0 12px 20px; padding: 0; color: #e2e8f0;">
-                <li style="margin-bottom: 8px;">Abre <a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline; font-weight: 600;">script.google.com</a> con tu cuenta de Google y haz clic en <strong>Nuevo proyecto</strong>.</li>
-                <li style="margin-bottom: 8px;">Reemplaza todo el contenido del archivo <code style="background: #1e293b; color: #38bdf8; padding: 2px 7px; border-radius: 4px; border: 1px solid #334155;">Código.gs</code> por este script listo para producción:</li>
-            </ol>
-            <pre style="background: #020617; color: #f1f5f9; padding: 14px 16px; border-radius: 8px; border: 1px solid #334155; overflow-x: auto; font-size: 0.84rem; line-height: 1.45; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">function doPost(e) {
+        <div style="color: #f1f5f9 !important; font-size: 0.93rem; line-height: 1.6;">
+            <p style="color: #cbd5e1 !important; margin: 0 0 14px 0;">
+                Sigue estos 5 sencillos pasos para conectar tu cuenta de Gmail a través de Google Apps Script. Esta solución utiliza HTTPS estándar por el puerto 443 (que <strong>nunca es bloqueado por Render Free</strong>):
+            </p>
+
+            <div class="guide-steps">
+                <div class="guide-step">
+                    <span class="step-number">1</span>
+                    <div class="guide-step-body" style="color: #f1f5f9 !important;">
+                        Ingresa a <a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer" style="color: #38bdf8 !important; font-weight: 600; text-decoration: underline;">script.google.com</a> con tu cuenta de Google y haz clic en <strong>Nuevo proyecto</strong>.
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <span class="step-number">2</span>
+                    <div class="guide-step-body" style="color: #f1f5f9 !important;">
+                        En el editor de código, borra todo lo que esté en <code style="background: #020617 !important; color: #38bdf8 !important; border: 1px solid #334155; padding: 2px 7px; border-radius: 4px;">Código.gs</code> y pega el siguiente script listo para producción:
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-container-header" style="background: #0b1220 !important; border: 1px solid #334155 !important; border-bottom: none !important;">
+                <span style="color: #94a3b8 !important; font-weight: 600;">Código.gs — Google Apps Script (Email Relay HTTPS)</span>
+                <button type="button" class="copy-script-btn" onclick="copiarCodigoAppsScript(this)">📋 Copiar Código</button>
+            </div>
+            <pre id="codigo-apps-script" class="guide-pre" style="background: #020617 !important; color: #f8fafc !important; border: 1px solid #334155 !important;"><?= htmlspecialchars(trim(<<<'GAS_SCRIPT'
+/**
+ * Relay Transaccional de Correo Seguro por HTTPS 443
+ * Proyecto: Control de Usuarios y Gastos (Render Free -> Gmail)
+ * 
+ * Permite a la aplicación en Render Free entregar correos reales
+ * a cualquier destinatario a través de tu cuenta de Gmail sin costo.
+ */
+
+function doPost(e) {
   try {
-    var raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
-    var d = JSON.parse(raw);
-    if (d.token !== "CLAVE_RELAY_2026") {
-      return ContentService.createTextOutput(JSON.stringify({ok: false, error: "Token secreto invalido"}))
-        .setMimeType(ContentService.MimeType.JSON);
+    // Si se presiona el botón 'Ejecutar' manualmente en el editor sin cuerpo HTTP
+    if (!e || (!e.postData && !e.parameter)) {
+      return ejecutarPruebaLocal();
     }
-    GmailApp.sendEmail(d.to, d.subject, "", {
-      htmlBody: d.html,
-      name: d.fromName || "Control de Usuarios y Gastos"
+
+    var token = "";
+    var to = "";
+    var toName = "";
+    var subject = "";
+    var html = "";
+    var fromName = "Control de Usuarios y Gastos";
+
+    // 1. Intentar leer payload JSON (método estándar de la aplicación)
+    if (e.postData && e.postData.contents) {
+      try {
+        var d = JSON.parse(e.postData.contents);
+        token = d.token || "";
+        to = d.to || "";
+        toName = d.toName || "";
+        subject = d.subject || "";
+        html = d.html || "";
+        fromName = d.fromName || fromName;
+      } catch (errJson) {
+        // Formato no JSON estricto
+      }
+    }
+
+    // 2. Soporte fallback para formulario POST x-www-form-urlencoded
+    if (!to && e.parameter) {
+      token = token || e.parameter.token || "";
+      to = e.parameter.to || "";
+      toName = e.parameter.toName || "";
+      subject = e.parameter.subject || "";
+      html = e.parameter.html || "";
+      fromName = e.parameter.fromName || fromName;
+    }
+
+    // 3. Validar token secreto
+    if (token !== "CLAVE_RELAY_2026") {
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: false,
+        error: "Token secreto inválido. Configura 'CLAVE_RELAY_2026' en el panel de la aplicación."
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 4. Validar destinatario
+    if (!to) {
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: false,
+        error: "Falta el destinatario ('to')."
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 5. Despachar correo a través de GmailApp
+    GmailApp.sendEmail(to, subject || "Notificación del Sistema", "", {
+      htmlBody: html || "<p>Notificación enviada desde el sistema de Control de Usuarios y Gastos.</p>",
+      name: fromName
     });
-    return ContentService.createTextOutput(JSON.stringify({ok: true, message: "Correo despachado con exito"}))
-      .setMimeType(ContentService.MimeType.JSON);
+
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true,
+      message: "Correo entregado exitosamente a " + to,
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ok: false, error: err.toString()}))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: false,
+      error: "Error interno en Google Apps Script: " + err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
+/**
+ * Responde a peticiones GET (para verificar desde el navegador que el Webhook está activo)
+ */
 function doGet(e) {
+  var miCorreo = "";
+  try {
+    miCorreo = Session.getActiveUser().getEmail();
+  } catch (ignore) {}
+
   return ContentService.createTextOutput(JSON.stringify({
     ok: true,
     service: "Email Relay HTTPS 443 Activo",
-    tip: "El servicio esta en linea. Las solicitudes de envio se reciben via POST."
+    status: "Online y listo para recibir correos vía POST",
+    cuenta_gmail: miCorreo || "Autenticada",
+    fecha: new Date().toISOString(),
+    instrucciones: "Copia la URL terminada en /exec y configúrala con el token CLAVE_RELAY_2026."
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// Opcional: para probar desde el editor de Google sin recibir peticion web
-function probarDesdeEditor() {
+/**
+ * Función auxiliar para cuando se presiona 'Ejecutar' dentro del editor de Google
+ */
+function ejecutarPruebaLocal() {
   var miCorreo = Session.getActiveUser().getEmail();
-  GmailApp.sendEmail(miCorreo, "Prueba Relay Apps Script", "Tu Relay de Google Apps Script esta funcionando correctamente.");
-  Logger.log("Correo de prueba enviado con exito a: " + miCorreo);
-}</pre>
-            <ol start="3" style="margin: 12px 0 12px 20px; padding: 0; color: #e2e8f0;">
-                <li style="margin-bottom: 8px;">Haz clic en el botón azul superior <strong>Implementar &rarr; Nueva implementación</strong>.</li>
-                <li style="margin-bottom: 8px;">En el icono de engranaje (<em>Seleccionar tipo</em>), elige <strong>Aplicación web</strong>.</li>
-                <li style="margin-bottom: 8px;">Configura exactamente estos dos campos:
-                    <ul style="margin: 6px 0 6px 20px; color: #94a3b8;">
-                        <li style="margin-bottom: 4px;"><strong>Ejecutar como:</strong> <em>Yo (&lt;tu-cuenta@gmail.com&gt;)</em></li>
-                        <li style="margin-bottom: 4px;"><strong>Quién tiene acceso:</strong> <em>Cualquier persona (Anyone)</em></li>
-                    </ul>
-                </li>
-                <li style="margin-bottom: 8px;">Haz clic en <strong>Implementar</strong>, autoriza los permisos de acceso de Gmail y <strong>copia la URL</strong> que termina en <code style="background: #1e293b; color: #38bdf8; padding: 2px 7px; border-radius: 4px; border: 1px solid #334155;">/exec</code>.</li>
-                <li style="margin-bottom: 6px;">Pégala abajo en <em>Opción A — Webhook HTTPS 443</em>, escribe el token secreto <code style="background: #1e293b; color: #38bdf8; padding: 2px 7px; border-radius: 4px; border: 1px solid #334155;">CLAVE_RELAY_2026</code> y haz clic en <strong>Guardar Pasarela HTTPS 443</strong>.</li>
-            </ol>
-            <div style="margin-top: 14px; padding: 12px 14px; background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; border-radius: 6px; font-size: 0.88rem; color: #bae6fd; line-height: 1.5;">
-                <strong>Nota técnica:</strong> No presiones el botón "Ejecutar" sobre <code style="background: #1e293b; color: #38bdf8; padding: 1px 5px; border-radius: 3px;">doPost</code> dentro del editor de Google Apps Script. Ese botón local no incluye el cuerpo HTTP y mostrará error en la consola de Google. La prueba real se realiza enviando un correo desde el formulario inferior: <em>Diagnóstico y Envío de Prueba en Vivo</em>.
+  if (miCorreo) {
+    GmailApp.sendEmail(miCorreo, "Prueba de Relay Google Apps Script Exitosa", "", {
+      htmlBody: "<h3>¡Felicitaciones!</h3><p>Tu pasarela de correo Google Apps Script está funcionando al 100%.</p><p>Ya puedes copiar la URL de implementación y pegarla en tu aplicación de Gastos.</p>",
+      name: "Prueba Relay Apps Script"
+    });
+    Logger.log("Correo de prueba enviado exitosamente a: " + miCorreo);
+  }
+  return ContentService.createTextOutput(JSON.stringify({
+    ok: true,
+    mensaje: "Prueba local ejecutada exitosamente. Correo enviado a " + miCorreo
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+GAS_SCRIPT), ENT_QUOTES, 'UTF-8') ?></pre>
+
+            <div class="guide-steps">
+                <div class="guide-step">
+                    <span class="step-number">3</span>
+                    <div class="guide-step-body" style="color: #f1f5f9 !important;">
+                        Haz clic en el botón azul superior <strong>Implementar &rarr; Nueva implementación</strong>. En el engranaje (<em>Seleccionar tipo</em>), elige <strong>Aplicación web</strong> y configura exactamente:
+                        <ul style="margin: 6px 0 6px 20px; color: #cbd5e1 !important;">
+                            <li style="margin-bottom: 4px;"><strong>Ejecutar como:</strong> <em>Yo (&lt;tu-cuenta@gmail.com&gt;)</em></li>
+                            <li style="margin-bottom: 4px;"><strong>Quién tiene acceso:</strong> <strong style="color: #38bdf8 !important;">Cualquier persona (Anyone)</strong> &mdash; <em>Imprescindible para que Render pueda invocarlo</em>.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <span class="step-number">4</span>
+                    <div class="guide-step-body" style="color: #f1f5f9 !important;">
+                        Haz clic en <strong>Implementar</strong>. Google solicitará autorizar permisos de Gmail. Si muestra la pantalla de aviso <em>"Google no ha verificado esta aplicación"</em>, haz clic en <strong style="color: #fbbf24 !important;">Configuración avanzada</strong> &rarr; <strong style="color: #fbbf24 !important;">Ir a Proyecto (no seguro)</strong> &rarr; <strong style="color: #34d399 !important;">Permitir</strong>.
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <span class="step-number">5</span>
+                    <div class="guide-step-body" style="color: #f1f5f9 !important;">
+                        <strong>Copia la URL de la aplicación web</strong> (termina en <code style="background: #020617 !important; color: #38bdf8 !important; border: 1px solid #334155; padding: 2px 7px; border-radius: 4px;">/exec</code>). Pégala abajo en <em>Opción A &mdash; Webhook HTTPS 443</em>, escribe el token secreto <code style="background: #020617 !important; color: #38bdf8 !important; border: 1px solid #334155; padding: 2px 7px; border-radius: 4px;">CLAVE_RELAY_2026</code> y haz clic en <strong>Guardar Pasarela HTTPS 443</strong>.
+                    </div>
+                </div>
+            </div>
+
+            <div class="guide-note-box" style="margin-top: 16px; padding: 14px 18px; background: rgba(14, 165, 233, 0.12) !important; border-left: 4px solid #38bdf8 !important; border-radius: 8px; color: #e0f2fe !important;">
+                <strong style="color: #7dd3fc !important;">Comprobación instantánea:</strong>
+                Puedes abrir la URL terminada en <code style="background: #020617; color: #38bdf8; padding: 1px 5px; border-radius: 3px;">/exec</code> directamente en una pestaña de tu navegador (Chrome/Edge). Deberá responder un JSON confirmando <code style="background: #020617; color: #34d399; padding: 1px 5px; border-radius: 3px;">{"ok":true,"service":"Email Relay HTTPS 443 Activo"}</code>. Luego, haz una prueba real desde el formulario inferior <em>Diagnóstico y Envío de Prueba en Vivo</em>.
             </div>
         </div>
     </details>
+
+    <script>
+    function copiarCodigoAppsScript(btn) {
+        var el = document.getElementById('codigo-apps-script');
+        if (!el) return;
+        var text = el.innerText || el.textContent;
+        navigator.clipboard.writeText(text).then(function() {
+            var orig = btn.innerText;
+            btn.innerText = '✅ ¡Copiado!';
+            btn.style.background = '#065f46';
+            btn.style.color = '#34d399';
+            setTimeout(function() {
+                btn.innerText = orig;
+                btn.style.background = '';
+                btn.style.color = '';
+            }, 3000);
+        }).catch(function() {
+            alert('Por favor selecciona y copia el texto del código manualmente.');
+        });
+    }
+    </script>
 
     <form method="POST" action="?route=smtp.relay.save">
         <?= SecurityGuard::csrfField() ?>
