@@ -52,15 +52,23 @@ Repositorio desarrollado a partir del **Fork oficial** de [`arrietajohn/hexagona
 
 ### 1.1. Evolución de las Arquitecturas: Monolito → Capas → Onion → Hexagonal → Clean → DDD → Microservicios
 
+<p align="center">
+  <img src="devops/diagrams/evolucion_arquitecturas.svg" alt="Evolución de las Arquitecturas de Software" width="100%">
+</p>
+
+<details open>
+<summary>▶ <strong>Ver definición en código Mermaid (editable)</strong></summary>
+
 ```mermaid
 flowchart TD
-    A["Arquitectura Monolítica\n(Todo en uno: UI + Negocio + BD en un ejecutable)"] -->|"Problema: Código gigante y acoplamiento"| B["Arquitectura en N-Capas\n(Presentación → Negocio → Datos)"]
-    B -->|"Problema: La lógica depende de la BD"| C["Onion Architecture (Jeffrey Palermo, 2008)\n(Dependencias apuntan siempre hacia el centro)"]
-    C -->|"Problema: Desacoplar puertos tecnológicos"| D["Arquitectura Hexagonal (Cockburn, 2005)\n(Puertos y Adaptadores Driving/Driven)"]
-    D -->|"Consolidación estricta de Casos de Uso"| E["Clean Architecture (Uncle Bob, 2012)\n(Independiente de frameworks y BD)"]
-    E -->|"Alinear código con el lenguaje del negocio"| F["Domain-Driven Design (Eric Evans, 2003)\n(Lenguaje Ubicuo, Bounded Contexts, Aggregates)"]
-    F -->|"Escalabilidad masiva de equipos y tráfico"| G["Microservicios & Event-Driven (EDA / CQRS)\n(Servicios autónomos, mensajería asíncrona)"]
+    A["Arquitectura Monolítica<br/>(Todo en uno: UI + Negocio + BD en un ejecutable)"] -->|"Problema: Código gigante y acoplamiento"| B["Arquitectura en N-Capas<br/>(Presentación a Negocio a Datos)"]
+    B -->|"Problema: La lógica depende de la BD"| C["Onion Architecture (Jeffrey Palermo, 2008)<br/>(Dependencias apuntan siempre hacia el centro)"]
+    C -->|"Problema: Desacoplar puertos tecnológicos"| D["Arquitectura Hexagonal (Cockburn, 2005)<br/>(Puertos y Adaptadores Driving/Driven)"]
+    D -->|"Consolidación estricta de Casos de Uso"| E["Clean Architecture (Uncle Bob, 2012)<br/>(Independiente de frameworks y BD)"]
+    E -->|"Alinear código con el lenguaje del negocio"| F["Domain-Driven Design (Eric Evans, 2003)<br/>(Lenguaje Ubicuo, Bounded Contexts, Aggregates)"]
+    F -->|"Escalabilidad masiva de equipos y tráfico"| G["Microservicios y Event-Driven (EDA / CQRS)<br/>(Servicios autónomos, mensajería asíncrona)"]
 ```
+</details>
 
 1. **Arquitectura Monolítica:** Un solo bloque de software. Fácil de construir al inicio, pero con alto riesgo de disponibilidad (un error en un módulo consume la memoria y derriba toda la aplicación) y escalabilidad exclusivamente vertical.
 2. **Arquitectura en N-Capas:** Divide en capas horizontales (Presentación, Negocio, Acceso a Datos). Resuelve la organización básica, pero sufre de *acoplamiento en cascada*: las reglas de negocio dependen directamente de la base de datos (capa inferior).
@@ -119,13 +127,20 @@ flowchart TD
 
 ### 2.1. Diagrama de Arquitectura Hexagonal del Proyecto
 
+<p align="center">
+  <img src="devops/diagrams/arquitectura_hexagonal.svg" alt="Diagrama de Arquitectura Hexagonal Ports and Adapters" width="100%">
+</p>
+
+<details open>
+<summary>▶ <strong>Ver definición en código Mermaid (editable)</strong></summary>
+
 ```mermaid
 flowchart TD
     subgraph DrivingAdapters["Adaptadores Primarios (Driving Entrypoints)"]
-        WebUI["Web MVC / PRG\n(?route=gastos, users, reports)"]
-        RestAPI["RESTful JSON API\n(/api/gastos, /api/users, /api/auth)"]
-        Swagger["Swagger UI 3.0.3\n(?route=swagger)"]
-        ApiTester["Consola Web API\n(?route=api.tester)"]
+        WebUI["Web MVC / PRG<br/>(?route=gastos, users, reports)"]
+        RestAPI["RESTful JSON API<br/>(/api/gastos, /api/users, /api/auth)"]
+        Swagger["Swagger UI 3.0.3<br/>(?route=swagger)"]
+        ApiTester["Consola Web API<br/>(?route=api.tester)"]
     end
 
     subgraph PortsIn["Puertos de Entrada (Application Ports In)"]
@@ -137,18 +152,18 @@ flowchart TD
         CUUC["CreateUserUseCase"]
     end
 
-    subgraph HexCore["NÚCLEO DEL SISTEMA (Application & Domain)"]
+    subgraph HexCore["NÚCLEO DEL SISTEMA (Application y Domain)"]
         subgraph AppServices["Servicios de Aplicación (CQRS)"]
-            CGS["CreateGastoService\n(Commands DTO)"]
-            GGS["GetAllGastosService\n(Queries DTO)"]
+            CGS["CreateGastoService<br/>(Commands DTO)"]
+            GGS["GetAllGastosService<br/>(Queries DTO)"]
             CUS["CreateUserService"]
-            Mappers["Mappers Bidireccionales\n(App / Web / Persistence)"]
+            Mappers["Mappers Bidireccionales<br/>(App / Web / Persistence)"]
         end
 
         subgraph DomainCore["Capa de Dominio Pura (DDD)"]
-            GastoModel["Entidad GastoModel\n(Raíz de Agregado)"]
+            GastoModel["Entidad GastoModel<br/>(Raíz de Agregado)"]
             UserModel["Entidad UserModel"]
-            VOs["Value Objects Inmutables\n(GastoMonto, GastoFecha, UserId, UserEmail)"]
+            VOs["Value Objects Inmutables<br/>(GastoMonto, GastoFecha, UserId, UserEmail)"]
             Enums["Enums: GastoIvaRateEnum, UserRoleEnum"]
             Events["Eventos de Dominio: GastoCreated, UserCreated"]
             Exceptions["Excepciones: InvalidGastoIvaConsistencyException"]
@@ -165,20 +180,29 @@ flowchart TD
     end
 
     subgraph DrivenAdapters["Adaptadores Secundarios (Driven Infrastructure)"]
-        MySQL["GastoRepositoryMySQL\nUserRepositoryMySQL"]
-        InMemory["InMemoryGastoRepository\n(Fallback JSON)"]
-        FileCache["FileCacheAdapter\n(storage/cache/)"]
-        FileQueue["FileQueueEventPublisherAdapter\n(storage/queue/events.jsonl)"]
-        TaxRest["TaxIndicatorRestAdapter\n(API REST Externa)"]
-        EmailSender["EmailSenderService\n(PHPMailer + Pasarela HTTPS 443)"]
+        MySQL["GastoRepositoryMySQL<br/>UserRepositoryMySQL"]
+        InMemory["InMemoryGastoRepository<br/>(Fallback JSON)"]
+        FileCache["FileCacheAdapter<br/>(storage/cache/)"]
+        FileQueue["FileQueueEventPublisherAdapter<br/>(storage/queue/events.jsonl)"]
+        TaxRest["TaxIndicatorRestAdapter<br/>(API REST Externa)"]
+        EmailSender["EmailSenderService<br/>(PHPMailer + Pasarela HTTPS 443)"]
     end
 
-    DrivingAdapters --> PortsIn
-    PortsIn --> AppServices
-    AppServices --> DomainCore
-    AppServices --> PortsOut
-    PortsOut --> DrivenAdapters
+    WebUI --> CGUC
+    RestAPI --> CGUC
+    Swagger -.-> RestAPI
+    ApiTester --> RestAPI
+    CGUC --> CGS
+    CUUC --> CUS
+    CGS --> DomainCore
+    CGS --> SGP
+    CUS --> SGP
+    SGP --> MySQL
+    QueuePort --> FileQueue
+    TaxPort --> TaxRest
+    EmailPort --> EmailSender
 ```
+</details>
 
 ---
 
@@ -222,6 +246,13 @@ HTTP GET /api/gastos  ──► GetAllGastosQuery  ──► GetAllGastosService
 ---
 
 ### 2.4. Diagrama Entidad-Relación de la Base de Datos
+
+<p align="center">
+  <img src="devops/diagrams/modelo_datos_er.svg" alt="Modelo Entidad-Relación de Base de Datos" width="100%">
+</p>
+
+<details open>
+<summary>▶ <strong>Ver definición en código Mermaid (editable)</strong></summary>
 
 ```mermaid
 erDiagram
@@ -278,6 +309,7 @@ erDiagram
     ROLES ||--o{ USERS : "posee"
     USERS ||--o{ GASTOS : "registra"
 ```
+</details>
 
 ---
 
