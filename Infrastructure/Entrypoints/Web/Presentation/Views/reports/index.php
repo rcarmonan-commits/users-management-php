@@ -1,164 +1,138 @@
 <?php
 /**
  * Centro de Reportes Analíticos CQRS — `Views/reports/index.php`
- * Proyecta vistas analíticas desacopladas (Auditoría Fiscal de IVA, Ranking por Lugar,
- * Consolidado por Usuario, Evolución Temporal Mensual, Top 5 Gastos de Mayor Impacto,
- * Detalle Filtrado y Directorio por Rol) consumiendo exclusivamente los casos de
- * uso de lectura (`GetAllGastosUseCase` y `GetAllUsersUseCase`).
+ * Proyecciones analíticas desacopladas con FILTROS INDEPENDIENTES POR REPORTE.
+ * Cada módulo de consulta opera de forma autónoma sobre los casos de uso de lectura
+ * (`GetAllGastosUseCase` y `GetAllUsersUseCase`), permitiendo parametrizar cada vista
+ * sin afectar las demás.
  */
 require __DIR__ . '/../layouts/header.php';
 require __DIR__ . '/../layouts/menu.php';
 
-$buildFilterUrl = static function(array $overrides = array()) use ($filters): string {
-    $merged = array_merge($filters, $overrides);
-    $params = array('route' => 'reports');
+$buildUrl = static function(array $params = array()): string {
+    $current = $_GET;
+    unset($current['route'], $current['export']);
+    $merged = array_merge($current, $params);
+    $clean = array('route' => 'reports');
     foreach ($merged as $k => $v) {
         if ($v !== '' && $v !== null) {
-            $params[$k] = $v;
+            $clean[$k] = $v;
         }
     }
-    return '?' . http_build_query($params);
+    return '?' . http_build_query($clean);
 };
+
+$renderPreservedHidden = static function(array $excludeKeys = array()): string {
+    $current = $_GET;
+    unset($current['route'], $current['export']);
+    $html = '';
+    foreach ($current as $k => $v) {
+        if (!in_array($k, $excludeKeys, true) && $v !== '' && $v !== null) {
+            $html .= '<input type="hidden" name="' . htmlspecialchars((string) $k, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8') . '">';
+        }
+    }
+    return $html;
+};
+
+$hasIvaFilter = ($filters['iva_desde'] !== '' || $filters['iva_hasta'] !== '' || $filters['iva_tarifa'] !== '');
+$hasLugFilter = ($filters['lug_q'] !== '' || $filters['lug_order'] !== 'conIva');
+$hasUsrFilter = ($filters['usr_q'] !== '' || $filters['usr_min'] !== '' || $filters['usr_max'] !== '');
+$hasMesFilter = ($filters['mes_desde'] !== '' || $filters['mes_hasta'] !== '');
+$hasTopFilter = ($filters['top_limit'] != 5 || $filters['top_lugar'] !== '');
+$hasDetFilter = ($filters['det_q'] !== '' || $filters['det_desde'] !== '' || $filters['det_hasta'] !== '' || $filters['det_usr'] !== '' || $filters['det_tarifa'] !== '' || $filters['det_min'] !== '' || $filters['det_max'] !== '');
+$hasRolFilter = ($filters['rol_filtro'] !== '' || $filters['rol_estado'] !== '');
+$anyFilterActive = ($hasIvaFilter || $hasLugFilter || $hasUsrFilter || $hasMesFilter || $hasTopFilter || $hasDetFilter || $hasRolFilter);
 ?>
 
 <div class="page-header">
     <div>
-        <span class="badge badge-emerald">CQRS Read Projections &middot; Cache-Aside</span>
+        <span class="badge badge-emerald">CQRS Read Projections &middot; Consultas Desacopladas</span>
         <h1>Centro de Reportes Analíticos y Auditoría Contable</h1>
-        <p class="muted">Consultas ejecutivas desacopladas construidas sobre <code>GetAllGastosUseCase</code> y <code>GetAllUsersUseCase</code>.</p>
+        <p class="muted">Filtros independientes por cada consulta y módulo analítico construidos sobre la capa de lectura CQRS.</p>
     </div>
     <div class="header-actions">
-        <a class="btn btn-secondary" href="<?= htmlspecialchars($buildFilterUrl(array('export' => 'csv')), ENT_QUOTES, 'UTF-8') ?>">📥 Exportar CSV</a>
+        <?php if ($anyFilterActive): ?>
+            <a class="btn btn-secondary" href="?route=reports">Restablecer Todos los Reportes</a>
+        <?php endif; ?>
         <button type="button" class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir</button>
         <a class="btn btn-primary" href="?route=gastos.create">+ Registrar Gasto</a>
     </div>
 </div>
 
-<!-- BARRA DE FILTROS UNIFICADA CQRS -->
-<div class="card-panel" style="margin-bottom: 22px;">
-    <h2>Filtros de Consulta CQRS Multi-Criterio</h2>
-    <p class="muted">Aplica filtros combinados sobre la proyección de lectura sin alterar el estado del almacén.</p>
-
-    <form method="GET" action="" class="filter-bar">
-        <input type="hidden" name="route" value="reports">
-        <input type="hidden" name="rolFiltro" value="<?= htmlspecialchars((string) ($filters['rolFiltro'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-
-        <div style="display: flex; flex-wrap: wrap; gap: 12px; width: 100%;">
-            <div style="flex: 1; min-width: 170px;">
-                <label for="qLugar" style="font-size: 0.8rem; margin-bottom: 4px;">Lugar / Comercio</label>
-                <input type="text" id="qLugar" name="qLugar" placeholder="ej: Éxito, Librería..."
-                    value="<?= htmlspecialchars((string) ($filters['qLugar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 100%;">
-            </div>
-
-            <div style="flex: 1; min-width: 145px;">
-                <label for="fechaDesde" style="font-size: 0.8rem; margin-bottom: 4px;">Fecha Desde</label>
-                <input type="date" id="fechaDesde" name="fechaDesde"
-                    value="<?= htmlspecialchars((string) ($filters['fechaDesde'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 100%;">
-            </div>
-
-            <div style="flex: 1; min-width: 145px;">
-                <label for="fechaHasta" style="font-size: 0.8rem; margin-bottom: 4px;">Fecha Hasta</label>
-                <input type="date" id="fechaHasta" name="fechaHasta"
-                    value="<?= htmlspecialchars((string) ($filters['fechaHasta'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 100%;">
-            </div>
-
-            <div style="flex: 1; min-width: 160px;">
-                <label for="usuarioFiltro" style="font-size: 0.8rem; margin-bottom: 4px;">Usuario Responsable</label>
-                <select id="usuarioFiltro" name="usuarioFiltro" style="width: 100%;">
-                    <option value="">Todos los usuarios</option>
-                    <?php foreach (($distinctUserNames ?? array()) as $uName): ?>
-                        <option value="<?= htmlspecialchars($uName, ENT_QUOTES, 'UTF-8') ?>" <?= (($filters['usuarioFiltro'] ?? '') === $uName) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($uName, ENT_QUOTES, 'UTF-8') ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div style="flex: 1; min-width: 140px;">
-                <label for="tarifaIva" style="font-size: 0.8rem; margin-bottom: 4px;">Tarifa de IVA</label>
-                <select id="tarifaIva" name="tarifaIva" style="width: 100%;">
-                    <option value="">Todas las tarifas</option>
-                    <option value="19" <?= (($filters['tarifaIva'] ?? '') === '19') ? 'selected' : '' ?>>19% General</option>
-                    <option value="5" <?= (($filters['tarifaIva'] ?? '') === '5') ? 'selected' : '' ?>>5% Reducido</option>
-                    <option value="0" <?= (($filters['tarifaIva'] ?? '') === '0') ? 'selected' : '' ?>>0% Exento</option>
-                    <option value="other" <?= (($filters['tarifaIva'] ?? '') === 'other') ? 'selected' : '' ?>>Otras Tarifas</option>
-                </select>
-            </div>
-
-            <div style="flex: 1; min-width: 120px;">
-                <label for="montoMin" style="font-size: 0.8rem; margin-bottom: 4px;">Monto Mín ($)</label>
-                <input type="number" step="0.01" id="montoMin" name="montoMin" placeholder="0.00"
-                    value="<?= htmlspecialchars((string) ($filters['montoMin'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 100%;">
-            </div>
-
-            <div style="flex: 1; min-width: 120px;">
-                <label for="montoMax" style="font-size: 0.8rem; margin-bottom: 4px;">Monto Máx ($)</label>
-                <input type="number" step="0.01" id="montoMax" name="montoMax" placeholder="Sin límite"
-                    value="<?= htmlspecialchars((string) ($filters['montoMax'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width: 100%;">
-            </div>
-        </div>
-
-        <div class="form-actions" style="margin-top: 14px; width: 100%; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
-            <button type="submit" class="btn btn-primary">🔍 Aplicar Filtros CQRS</button>
-            <a class="btn btn-secondary" href="?route=reports">Restablecer</a>
-            <a class="btn btn-secondary" href="<?= htmlspecialchars($buildFilterUrl(array('export' => 'csv')), ENT_QUOTES, 'UTF-8') ?>">📥 Exportar CSV</a>
-            <button type="button" class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir</button>
-        </div>
-    </form>
-
-    <?php if (!empty($hasActiveFilters)): ?>
-        <div class="filter-chips-bar">
-            <span style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">Filtros Activos:</span>
-            <?php foreach ($activeFilters as $af): ?>
-                <span class="filter-chip">
-                    <?= htmlspecialchars($af['label'], ENT_QUOTES, 'UTF-8') ?>:
-                    <?php /* 'value' llega YA escapado desde buildReportsViewData() (public/index.php) */ ?>
-                    <strong><?= $af['value'] ?></strong>
-                    <?php
-                    $clearParam = $af['param'];
-                    $removeUrl = match ($clearParam) {
-                        'fechaRango' => $buildFilterUrl(array('fechaDesde' => '', 'fechaHasta' => '')),
-                        'montoRango' => $buildFilterUrl(array('montoMin' => '', 'montoMax' => '')),
-                        default => $buildFilterUrl(array($clearParam => '')),
-                    };
-                    ?>
-                    <a href="<?= htmlspecialchars($removeUrl, ENT_QUOTES, 'UTF-8') ?>" class="filter-chip-remove" title="Quitar filtro">&times;</a>
-                </span>
-            <?php endforeach; ?>
-            <a href="?route=reports" class="filter-clear-all">Limpiar todos</a>
-        </div>
-    <?php endif; ?>
-</div>
-
-<!-- KPIS EJECUTIVOS (FILTRADOS VS GLOBALES) -->
+<!-- KPIS EJECUTIVOS GLOBALES DEL SISTEMA -->
 <section class="kpi-grid">
     <div class="kpi-card">
-        <span class="kpi-label">Gastos Filtrados</span>
-        <strong class="kpi-value"><?= (int) ($filteredTotals['count'] ?? 0) ?> <small style="font-size: 0.9rem; font-weight: normal; color: #94a3b8;">/ <?= (int) ($globalTotals['count'] ?? 0) ?></small></strong>
-        <span class="kpi-foot">Ticket medio: $<?= number_format((float) ($filteredTotals['avgConIva'] ?? 0), 2, ',', '.') ?></span>
+        <span class="kpi-label">Total Transacciones Globales</span>
+        <strong class="kpi-value"><?= (int) ($globalTotals['count'] ?? 0) ?></strong>
+        <span class="kpi-foot">Ticket medio global: $<?= number_format((float) ($globalTotals['avgConIva'] ?? 0), 2, ',', '.') ?></span>
     </div>
     <div class="kpi-card">
-        <span class="kpi-label">Base Gravable Sin IVA</span>
-        <strong class="kpi-value">$<?= number_format((float) ($filteredTotals['sinIva'] ?? 0), 2, ',', '.') ?></strong>
-        <span class="kpi-foot">Global: $<?= number_format((float) ($globalTotals['sinIva'] ?? 0), 2, ',', '.') ?></span>
+        <span class="kpi-label">Base Gravable Acumulada</span>
+        <strong class="kpi-value">$<?= number_format((float) ($globalTotals['sinIva'] ?? 0), 2, ',', '.') ?></strong>
+        <span class="kpi-foot">Subtotal general Sin IVA</span>
     </div>
     <div class="kpi-card">
-        <span class="kpi-label">IVA Soportado / Liquidado</span>
-        <strong class="kpi-value">$<?= number_format((float) ($filteredTotals['iva'] ?? 0), 2, ',', '.') ?></strong>
-        <span class="kpi-foot">Calculado al centavo con precisión fiscal</span>
+        <span class="kpi-label">IVA Global Soportado</span>
+        <strong class="kpi-value">$<?= number_format((float) ($globalTotals['iva'] ?? 0), 2, ',', '.') ?></strong>
+        <span class="kpi-foot">Validado al centavo con precisión fiscal</span>
     </div>
     <div class="kpi-card kpi-highlight">
-        <span class="kpi-label">Ejecución Presupuestal Total</span>
-        <strong class="kpi-value">$<?= number_format((float) ($filteredTotals['conIva'] ?? 0), 2, ',', '.') ?></strong>
-        <span class="kpi-foot">Mín: $<?= number_format((float) ($filteredTotals['min'] ?? 0), 2, ',', '.') ?> &middot; Máx: $<?= number_format((float) ($filteredTotals['max'] ?? 0), 2, ',', '.') ?></span>
+        <span class="kpi-label">Ejecución Presupuestal Global</span>
+        <strong class="kpi-value">$<?= number_format((float) ($globalTotals['conIva'] ?? 0), 2, ',', '.') ?></strong>
+        <span class="kpi-foot">Total general Con IVA registrado</span>
     </div>
 </section>
 
 <div class="reports-grid">
     <!-- MÓDULO 1: AUDITORÍA FISCAL Y DESGLOSE DE IVA -->
-    <div class="card-panel">
-        <h2>1. Auditoría Fiscal y Desglose por Tarifa de IVA</h2>
-        <p class="muted">Conciliación contable por tarifas tributarias colombianas (General 19%, Reducido 5%, Exento 0%).</p>
+    <div class="card-panel" id="rep1">
+        <div class="report-module-header">
+            <div>
+                <h2>1. Auditoría Fiscal y Desglose por Tarifa de IVA</h2>
+                <p class="muted">Conciliación contable por tarifas tributarias colombianas (19%, 5%, 0% y especiales).</p>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($buildUrl(array('export' => 'csv_iva')), ENT_QUOTES, 'UTF-8') ?>">
+                📥 CSV IVA
+            </a>
+        </div>
+
+        <!-- Filtro exclusivo para este reporte -->
+        <form method="GET" action="#rep1" class="module-filter-bar">
+            <input type="hidden" name="route" value="reports">
+            <?= $renderPreservedHidden(array('iva_desde', 'iva_hasta', 'iva_tarifa')) ?>
+
+            <div class="filter-field">
+                <label for="iva_desde">Fecha Desde</label>
+                <input type="date" id="iva_desde" name="iva_desde" value="<?= htmlspecialchars((string) $filters['iva_desde'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="filter-field">
+                <label for="iva_hasta">Fecha Hasta</label>
+                <input type="date" id="iva_hasta" name="iva_hasta" value="<?= htmlspecialchars((string) $filters['iva_hasta'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="filter-field">
+                <label for="iva_tarifa">Tarifa</label>
+                <select id="iva_tarifa" name="iva_tarifa">
+                    <option value="">Todas las tarifas</option>
+                    <option value="19" <?= $filters['iva_tarifa'] === '19' ? 'selected' : '' ?>>19% General</option>
+                    <option value="5" <?= $filters['iva_tarifa'] === '5' ? 'selected' : '' ?>>5% Reducido</option>
+                    <option value="0" <?= $filters['iva_tarifa'] === '0' ? 'selected' : '' ?>>0% Exento</option>
+                    <option value="other" <?= $filters['iva_tarifa'] === 'other' ? 'selected' : '' ?>>Otras Tarifas</option>
+                </select>
+            </div>
+
+            <div class="module-filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Filtrar IVA</button>
+                <?php if ($hasIvaFilter): ?>
+                    <a href="<?= htmlspecialchars($buildUrl(array('iva_desde' => '', 'iva_hasta' => '', 'iva_tarifa' => '')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
+        <p class="module-meta-info">
+            Periodo fiscal analizado: <strong><?= (int) ($taxTotals['count'] ?? 0) ?></strong> transacciones coincidentes &middot; Total Con IVA: <strong>$<?= number_format((float) ($taxTotals['conIva'] ?? 0), 2, ',', '.') ?></strong>
+        </p>
 
         <div class="table-wrap">
             <table>
@@ -175,9 +149,7 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
                 <tbody>
                     <?php foreach (($taxBuckets ?? array()) as $tb): ?>
                         <tr>
-                            <td>
-                                <strong><?= htmlspecialchars($tb['label'], ENT_QUOTES, 'UTF-8') ?></strong>
-                            </td>
+                            <td><strong><?= htmlspecialchars($tb['label'], ENT_QUOTES, 'UTF-8') ?></strong></td>
                             <td><?= (int) $tb['count'] ?></td>
                             <td class="col-money">$<?= number_format((float) $tb['sinIva'], 2, ',', '.') ?></td>
                             <td class="col-money">$<?= number_format((float) $tb['iva'], 2, ',', '.') ?></td>
@@ -195,12 +167,51 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
     </div>
 
     <!-- MÓDULO 2: SUMA Y RANKING POR LUGAR -->
-    <div class="card-panel">
-        <h2>2. Ranking y Concentración por Establecimiento / Lugar</h2>
-        <p class="muted">Participación acumulada y distribución del gasto por comercio según los filtros activos.</p>
+    <div class="card-panel" id="rep2">
+        <div class="report-module-header">
+            <div>
+                <h2>2. Ranking y Concentración por Establecimiento / Lugar</h2>
+                <p class="muted">Participación acumulada y distribución del gasto por comercio o proveedor.</p>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($buildUrl(array('export' => 'csv_lugar')), ENT_QUOTES, 'UTF-8') ?>">
+                📥 CSV Lugares
+            </a>
+        </div>
+
+        <!-- Filtro exclusivo para este reporte -->
+        <form method="GET" action="#rep2" class="module-filter-bar">
+            <input type="hidden" name="route" value="reports">
+            <?= $renderPreservedHidden(array('lug_q', 'lug_order')) ?>
+
+            <div class="filter-field" style="flex: 2 1 180px;">
+                <label for="lug_q">Buscar Lugar / Comercio</label>
+                <input type="text" id="lug_q" name="lug_q" placeholder="ej: Éxito, Cafetería, Ara..."
+                    value="<?= htmlspecialchars((string) $filters['lug_q'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="filter-field">
+                <label for="lug_order">Ordenar Por</label>
+                <select id="lug_order" name="lug_order">
+                    <option value="conIva" <?= $filters['lug_order'] === 'conIva' ? 'selected' : '' ?>>Mayor Total ($)</option>
+                    <option value="count" <?= $filters['lug_order'] === 'count' ? 'selected' : '' ?>>Más Transacciones</option>
+                    <option value="sinIva" <?= $filters['lug_order'] === 'sinIva' ? 'selected' : '' ?>>Mayor Base Sin IVA</option>
+                </select>
+            </div>
+
+            <div class="module-filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Consultar</button>
+                <?php if ($hasLugFilter): ?>
+                    <a href="<?= htmlspecialchars($buildUrl(array('lug_q' => '', 'lug_order' => 'conIva')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
+        <p class="module-meta-info">
+            Establecimientos encontrados: <strong><?= count($byLugar ?? array()) ?></strong> &middot; Total agrupado: <strong>$<?= number_format((float) ($lugarTotalConIva ?? 0), 2, ',', '.') ?></strong>
+        </p>
 
         <?php if (empty($byLugar)): ?>
-            <p class="empty-state">No hay gastos que coincidan con los criterios seleccionados.</p>
+            <p class="empty-state">No hay establecimientos que coincidan con la búsqueda.</p>
         <?php else: ?>
             <div class="table-wrap">
                 <table>
@@ -236,9 +247,57 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
 
 <div class="reports-grid">
     <!-- MÓDULO 3: CONSOLIDADO POR USUARIO RESPONSABLE -->
-    <div class="card-panel">
-        <h2>3. Consolidado por Usuario Responsable</h2>
-        <p class="muted">Distribución presupuestal individualizada para auditoría interna y rendición de cuentas.</p>
+    <div class="card-panel" id="rep3">
+        <div class="report-module-header">
+            <div>
+                <h2>3. Consolidado por Usuario Responsable</h2>
+                <p class="muted">Distribución presupuestal individualizada para auditoría interna y rendición de cuentas.</p>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($buildUrl(array('export' => 'csv_usuario')), ENT_QUOTES, 'UTF-8') ?>">
+                📥 CSV Usuarios
+            </a>
+        </div>
+
+        <!-- Filtro exclusivo para este reporte -->
+        <form method="GET" action="#rep3" class="module-filter-bar">
+            <input type="hidden" name="route" value="reports">
+            <?= $renderPreservedHidden(array('usr_q', 'usr_min', 'usr_max')) ?>
+
+            <div class="filter-field" style="flex: 2 1 160px;">
+                <label for="usr_q">Usuario Responsable</label>
+                <select id="usr_q" name="usr_q">
+                    <option value="">Todos los usuarios</option>
+                    <?php foreach (($gastoUserNames ?? array()) as $uName): ?>
+                        <option value="<?= htmlspecialchars($uName, ENT_QUOTES, 'UTF-8') ?>" <?= (($filters['usr_q'] ?? '') === $uName) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($uName, ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="usr_min">Monto Mín ($)</label>
+                <input type="number" step="0.01" id="usr_min" name="usr_min" placeholder="0.00"
+                    value="<?= htmlspecialchars((string) $filters['usr_min'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="filter-field">
+                <label for="usr_max">Monto Máx ($)</label>
+                <input type="number" step="0.01" id="usr_max" name="usr_max" placeholder="Sin límite"
+                    value="<?= htmlspecialchars((string) $filters['usr_max'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="module-filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                <?php if ($hasUsrFilter): ?>
+                    <a href="<?= htmlspecialchars($buildUrl(array('usr_q' => '', 'usr_min' => '', 'usr_max' => '')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
+        <p class="module-meta-info">
+            Responsables con movimientos: <strong><?= count($byUser ?? array()) ?></strong> &middot; Total asignado: <strong>$<?= number_format((float) ($userTotalConIva ?? 0), 2, ',', '.') ?></strong>
+        </p>
 
         <?php if (empty($byUser)): ?>
             <p class="empty-state">Sin movimientos para los criterios seleccionados.</p>
@@ -273,9 +332,43 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
     </div>
 
     <!-- MÓDULO 4: EVOLUCIÓN TEMPORAL MENSUAL -->
-    <div class="card-panel">
-        <h2>4. Evolución Temporal Mensual (Histórico Cronológico)</h2>
-        <p class="muted">Comportamiento del gasto a lo largo del tiempo agrupado por periodos mensuales (<code>YYYY-MM</code>).</p>
+    <div class="card-panel" id="rep4">
+        <div class="report-module-header">
+            <div>
+                <h2>4. Evolución Temporal Mensual (Histórico Cronológico)</h2>
+                <p class="muted">Comportamiento del gasto a lo largo del tiempo agrupado por periodos mensuales (<code>YYYY-MM</code>).</p>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($buildUrl(array('export' => 'csv_mensual')), ENT_QUOTES, 'UTF-8') ?>">
+                📥 CSV Mensual
+            </a>
+        </div>
+
+        <!-- Filtro exclusivo para este reporte -->
+        <form method="GET" action="#rep4" class="module-filter-bar">
+            <input type="hidden" name="route" value="reports">
+            <?= $renderPreservedHidden(array('mes_desde', 'mes_hasta')) ?>
+
+            <div class="filter-field">
+                <label for="mes_desde">Periodo Desde</label>
+                <input type="date" id="mes_desde" name="mes_desde" value="<?= htmlspecialchars((string) $filters['mes_desde'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="filter-field">
+                <label for="mes_hasta">Periodo Hasta</label>
+                <input type="date" id="mes_hasta" name="mes_hasta" value="<?= htmlspecialchars((string) $filters['mes_hasta'], ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="module-filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Filtrar Meses</button>
+                <?php if ($hasMesFilter): ?>
+                    <a href="<?= htmlspecialchars($buildUrl(array('mes_desde' => '', 'mes_hasta' => '')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
+        <p class="module-meta-info">
+            Meses analizados: <strong><?= count($byMonth ?? array()) ?></strong> &middot; Total periodo: <strong>$<?= number_format((float) ($monthTotalConIva ?? 0), 2, ',', '.') ?></strong>
+        </p>
 
         <?php if (empty($byMonth)): ?>
             <p class="empty-state">No hay periodos con movimientos registrados.</p>
@@ -310,13 +403,46 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
     </div>
 </div>
 
-<!-- MÓDULO 5: TOP 5 GASTOS DE MAYOR IMPACTO -->
-<div class="card-panel" style="margin-bottom: 22px;">
-    <h2>5. Top 5 Gastos de Mayor Impacto Presupuestal</h2>
-    <p class="muted">Transacciones individuales más significativas dentro de los resultados filtrados.</p>
+<!-- MÓDULO 5: TOP GASTOS DE MAYOR IMPACTO -->
+<div class="card-panel" id="rep5" style="margin-bottom: 22px;">
+    <div class="report-module-header">
+        <div>
+            <h2>5. Top Gastos de Mayor Impacto Presupuestal</h2>
+            <p class="muted">Transacciones individuales más significativas ordenadas por monto total Con IVA.</p>
+        </div>
+    </div>
+
+    <!-- Filtro exclusivo para este reporte -->
+    <form method="GET" action="#rep5" class="module-filter-bar">
+        <input type="hidden" name="route" value="reports">
+        <?= $renderPreservedHidden(array('top_limit', 'top_lugar')) ?>
+
+        <div class="filter-field" style="flex: 1 1 120px;">
+            <label for="top_limit">Límite Top</label>
+            <select id="top_limit" name="top_limit">
+                <option value="3" <?= $filters['top_limit'] == 3 ? 'selected' : '' ?>>Top 3</option>
+                <option value="5" <?= $filters['top_limit'] == 5 ? 'selected' : '' ?>>Top 5</option>
+                <option value="10" <?= $filters['top_limit'] == 10 ? 'selected' : '' ?>>Top 10</option>
+                <option value="15" <?= $filters['top_limit'] == 15 ? 'selected' : '' ?>>Top 15</option>
+            </select>
+        </div>
+
+        <div class="filter-field" style="flex: 2 1 200px;">
+            <label for="top_lugar">Filtrar Lugar Específico (Opcional)</label>
+            <input type="text" id="top_lugar" name="top_lugar" placeholder="ej: Éxito, Ara..."
+                value="<?= htmlspecialchars((string) $filters['top_lugar'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div class="module-filter-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Actualizar Top</button>
+            <?php if ($hasTopFilter): ?>
+                <a href="<?= htmlspecialchars($buildUrl(array('top_limit' => '5', 'top_lugar' => '')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+            <?php endif; ?>
+        </div>
+    </form>
 
     <?php if (empty($topGastos)): ?>
-        <p class="empty-state">No hay gastos para clasificar.</p>
+        <p class="empty-state">No hay gastos para clasificar con los criterios indicados.</p>
     <?php else: ?>
         <div class="table-wrap">
             <table>
@@ -352,16 +478,84 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
 </div>
 
 <!-- MÓDULO 6: TABLA DETALLADA DE GASTOS FILTRADOS -->
-<div class="card-panel" style="margin-bottom: 22px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+<div class="card-panel" id="rep6" style="margin-bottom: 22px;">
+    <div class="report-module-header">
         <div>
-            <h2>6. Tabla de Gastos Filtrados (Detalle Transaccional)</h2>
-            <p class="muted" style="margin: 0;">Mostrando <strong><?= count($filteredGastos ?? array()) ?></strong> registro(s) coincidentes.</p>
+            <h2>6. Tabla de Gastos Filtrados (Detalle Transaccional Completo)</h2>
+            <p class="muted">Consulta analítica tabular con criterios combinables para auditoría minuciosa.</p>
         </div>
-        <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($buildFilterUrl(array('export' => 'csv')), ENT_QUOTES, 'UTF-8') ?>">
-            📥 Descargar CSV para Excel
+        <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($buildUrl(array('export' => 'csv_detalle')), ENT_QUOTES, 'UTF-8') ?>">
+            📥 Descargar CSV Detallado
         </a>
     </div>
+
+    <!-- Filtro exclusivo para la tabla detallada -->
+    <form method="GET" action="#rep6" class="module-filter-bar">
+        <input type="hidden" name="route" value="reports">
+        <?= $renderPreservedHidden(array('det_q', 'det_desde', 'det_hasta', 'det_usr', 'det_tarifa', 'det_min', 'det_max')) ?>
+
+        <div class="filter-field" style="flex: 2 1 180px;">
+            <label for="det_q">Buscar Término</label>
+            <input type="text" id="det_q" name="det_q" placeholder="Lugar, usuario o descripción..."
+                value="<?= htmlspecialchars((string) $filters['det_q'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div class="filter-field">
+            <label for="det_desde">Fecha Desde</label>
+            <input type="date" id="det_desde" name="det_desde" value="<?= htmlspecialchars((string) $filters['det_desde'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div class="filter-field">
+            <label for="det_hasta">Fecha Hasta</label>
+            <input type="date" id="det_hasta" name="det_hasta" value="<?= htmlspecialchars((string) $filters['det_hasta'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div class="filter-field">
+            <label for="det_usr">Usuario</label>
+            <select id="det_usr" name="det_usr">
+                <option value="">Todos</option>
+                <?php foreach (($gastoUserNames ?? array()) as $uName): ?>
+                    <option value="<?= htmlspecialchars($uName, ENT_QUOTES, 'UTF-8') ?>" <?= (($filters['det_usr'] ?? '') === $uName) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($uName, ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="filter-field">
+            <label for="det_tarifa">Tarifa IVA</label>
+            <select id="det_tarifa" name="det_tarifa">
+                <option value="">Todas</option>
+                <option value="19" <?= $filters['det_tarifa'] === '19' ? 'selected' : '' ?>>19% General</option>
+                <option value="5" <?= $filters['det_tarifa'] === '5' ? 'selected' : '' ?>>5% Reducido</option>
+                <option value="0" <?= $filters['det_tarifa'] === '0' ? 'selected' : '' ?>>0% Exento</option>
+                <option value="other" <?= $filters['det_tarifa'] === 'other' ? 'selected' : '' ?>>Otras Tarifas</option>
+            </select>
+        </div>
+
+        <div class="filter-field">
+            <label for="det_min">Monto Mín ($)</label>
+            <input type="number" step="0.01" id="det_min" name="det_min" placeholder="0.00"
+                value="<?= htmlspecialchars((string) $filters['det_min'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div class="filter-field">
+            <label for="det_max">Monto Máx ($)</label>
+            <input type="number" step="0.01" id="det_max" name="det_max" placeholder="Sin límite"
+                value="<?= htmlspecialchars((string) $filters['det_max'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div class="module-filter-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar Tabla</button>
+            <?php if ($hasDetFilter): ?>
+                <a href="<?= htmlspecialchars($buildUrl(array('det_q' => '', 'det_desde' => '', 'det_hasta' => '', 'det_usr' => '', 'det_tarifa' => '', 'det_min' => '', 'det_max' => '')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+            <?php endif; ?>
+        </div>
+    </form>
+
+    <p class="module-meta-info">
+        Registros filtrados: <strong><?= (int) ($detTotals['count'] ?? 0) ?></strong> &middot; Subtotal Sin IVA: <strong>$<?= number_format((float) ($detTotals['sinIva'] ?? 0), 2, ',', '.') ?></strong> &middot; IVA: <strong>$<?= number_format((float) ($detTotals['iva'] ?? 0), 2, ',', '.') ?></strong> &middot; Total Con IVA: <strong class="text-emerald">$<?= number_format((float) ($detTotals['conIva'] ?? 0), 2, ',', '.') ?></strong>
+    </p>
 
     <?php if (empty($filteredGastos)): ?>
         <p class="empty-state">No se encontraron transacciones que cumplan todos los filtros seleccionados.</p>
@@ -404,30 +598,47 @@ $buildFilterUrl = static function(array $overrides = array()) use ($filters): st
 </div>
 
 <!-- MÓDULO 7: DIRECTORIO DE USUARIOS POR ROL -->
-<div class="card-panel">
-    <h2>7. Directorio y Auditoría de Usuarios por Rol</h2>
-    <p class="muted">Filtrado transversal de cuentas según su nivel de privilegios (<code>ADMIN</code>, <code>MEMBER</code>, <code>REVIEWER</code>).</p>
+<div class="card-panel" id="rep7">
+    <div class="report-module-header">
+        <div>
+            <h2>7. Directorio y Auditoría de Usuarios por Rol</h2>
+            <p class="muted">Filtrado transversal de cuentas según su nivel de privilegios (<code>ADMIN</code>, <code>MEMBER</code>, <code>REVIEWER</code>).</p>
+        </div>
+    </div>
 
-    <form method="GET" action="" class="filter-bar" style="margin-bottom: 14px;">
+    <!-- Filtro exclusivo para este reporte -->
+    <form method="GET" action="#rep7" class="module-filter-bar">
         <input type="hidden" name="route" value="reports">
-        <input type="hidden" name="qLugar" value="<?= htmlspecialchars((string) ($filters['qLugar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="fechaDesde" value="<?= htmlspecialchars((string) ($filters['fechaDesde'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="fechaHasta" value="<?= htmlspecialchars((string) ($filters['fechaHasta'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="usuarioFiltro" value="<?= htmlspecialchars((string) ($filters['usuarioFiltro'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="tarifaIva" value="<?= htmlspecialchars((string) ($filters['tarifaIva'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-        <select name="rolFiltro">
-            <option value="">Todos los roles (<?= (int) ($globalTotals['usersCount'] ?? 0) ?> usuarios)</option>
-            <?php foreach (($roleCounts ?? array()) as $roleKey => $rCount): ?>
-                <option value="<?= htmlspecialchars((string) $roleKey, ENT_QUOTES, 'UTF-8') ?>"
-                    <?= (($filters['rolFiltro'] ?? '') === $roleKey) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string) $roleKey, ENT_QUOTES, 'UTF-8') ?> (<?= (int) $rCount ?>)
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="btn btn-primary">Filtrar Rol</button>
-        <?php if (!empty($filters['rolFiltro'])): ?>
-            <a class="btn btn-secondary" href="<?= htmlspecialchars($buildFilterUrl(array('rolFiltro' => '')), ENT_QUOTES, 'UTF-8') ?>">Ver Todos</a>
-        <?php endif; ?>
+        <?= $renderPreservedHidden(array('rol_filtro', 'rol_estado')) ?>
+
+        <div class="filter-field" style="flex: 2 1 200px;">
+            <label for="rol_filtro">Rol de Dominio</label>
+            <select id="rol_filtro" name="rol_filtro">
+                <option value="">Todos los roles (<?= (int) ($globalTotals['usersCount'] ?? 0) ?> usuarios)</option>
+                <?php foreach (($roleCounts ?? array()) as $roleKey => $rCount): ?>
+                    <option value="<?= htmlspecialchars((string) $roleKey, ENT_QUOTES, 'UTF-8') ?>"
+                        <?= (($filters['rol_filtro'] ?? '') === $roleKey) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) $roleKey, ENT_QUOTES, 'UTF-8') ?> (<?= (int) $rCount ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="filter-field">
+            <label for="rol_estado">Estado</label>
+            <select id="rol_estado" name="rol_estado">
+                <option value="">Todos los estados</option>
+                <option value="ACTIVE" <?= ($filters['rol_estado'] ?? '') === 'ACTIVE' ? 'selected' : '' ?>>Activo</option>
+                <option value="INACTIVE" <?= ($filters['rol_estado'] ?? '') === 'INACTIVE' ? 'selected' : '' ?>>Inactivo</option>
+            </select>
+        </div>
+
+        <div class="module-filter-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar Usuarios</button>
+            <?php if ($hasRolFilter): ?>
+                <a href="<?= htmlspecialchars($buildUrl(array('rol_filtro' => '', 'rol_estado' => '')), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary btn-sm">Limpiar</a>
+            <?php endif; ?>
+        </div>
     </form>
 
     <div class="table-wrap">

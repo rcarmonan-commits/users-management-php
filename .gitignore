@@ -58,3 +58,13 @@ yarn-error.log*
 docs/
 .vscode/settings.json
 *.ps1
+# Configuracion local de asistentes y editor (no forma parte de la entrega)
+.claude/
+.agents/
+.cursorrules
+.clinerules
+CLAUDE.md
+.github/copilot-instructions.md
+.vscode/
+GUIA_VIDEO_SUSTENTACION.*
+.spec-kit/

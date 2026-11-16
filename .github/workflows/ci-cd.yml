@@ -1,6 +1,7 @@
 name: CI/CD — Arquitectura Hexagonal PHP 8.3 (Usuarios + Gastos #6)
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main, "feature/**", "fix/**", "security/**" ]
   pull_request:

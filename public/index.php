@@ -1220,15 +1220,45 @@ function buildHomeViewData(string $message = ''): array
  */
 function buildReportsViewData(): array
 {
-    $qLugar = isset($_GET['qLugar']) ? trim((string) $_GET['qLugar']) : '';
-    $fechaDesde = isset($_GET['fechaDesde']) ? trim((string) $_GET['fechaDesde']) : '';
-    $fechaHasta = isset($_GET['fechaHasta']) ? trim((string) $_GET['fechaHasta']) : '';
-    $usuarioFiltro = isset($_GET['usuarioFiltro']) ? trim((string) $_GET['usuarioFiltro']) : '';
-    $tarifaIva = isset($_GET['tarifaIva']) ? trim((string) $_GET['tarifaIva']) : '';
-    $montoMin = isset($_GET['montoMin']) && $_GET['montoMin'] !== '' ? (float) $_GET['montoMin'] : null;
-    $montoMax = isset($_GET['montoMax']) && $_GET['montoMax'] !== '' ? (float) $_GET['montoMax'] : null;
-    $rolFiltro = isset($_GET['rolFiltro']) ? strtoupper(trim((string) $_GET['rolFiltro'])) : '';
-    $exportFormat = isset($_GET['export']) ? strtolower(trim((string) $_GET['export'])) : '';
+    // 0. Captura de parámetros independientes por cada reporte analítico CQRS.
+    // Incluye retrocompatibilidad automática con parámetros legados generales.
+    // Módulo 1: Auditoría Fiscal de IVA
+    $ivaDesde = trim((string) ($_GET['iva_desde'] ?? ($_GET['fechaDesde'] ?? '')));
+    $ivaHasta = trim((string) ($_GET['iva_hasta'] ?? ($_GET['fechaHasta'] ?? '')));
+    $ivaTarifa = trim((string) ($_GET['iva_tarifa'] ?? ($_GET['tarifaIva'] ?? '')));
+
+    // Módulo 2: Ranking por Lugar / Establecimiento
+    $lugQ = trim((string) ($_GET['lug_q'] ?? ($_GET['qLugar'] ?? '')));
+    $lugOrder = trim((string) ($_GET['lug_order'] ?? 'conIva'));
+
+    // Módulo 3: Consolidado por Usuario Responsable
+    $usrQ = trim((string) ($_GET['usr_q'] ?? ($_GET['usuarioFiltro'] ?? '')));
+    $usrMin = isset($_GET['usr_min']) && $_GET['usr_min'] !== '' ? (float) $_GET['usr_min'] : null;
+    $usrMax = isset($_GET['usr_max']) && $_GET['usr_max'] !== '' ? (float) $_GET['usr_max'] : null;
+
+    // Módulo 4: Evolución Temporal Mensual
+    $mesDesde = trim((string) ($_GET['mes_desde'] ?? ''));
+    $mesHasta = trim((string) ($_GET['mes_hasta'] ?? ''));
+
+    // Módulo 5: Top Gastos de Mayor Impacto
+    $topLimit = isset($_GET['top_limit']) ? max(3, min(25, (int) $_GET['top_limit'])) : 5;
+    $topLugar = trim((string) ($_GET['top_lugar'] ?? ''));
+
+    // Módulo 6: Tabla Detallada Transaccional
+    $detQ = trim((string) ($_GET['det_q'] ?? ($_GET['qLugar'] ?? '')));
+    $detDesde = trim((string) ($_GET['det_desde'] ?? ($_GET['fechaDesde'] ?? '')));
+    $detHasta = trim((string) ($_GET['det_hasta'] ?? ($_GET['fechaHasta'] ?? '')));
+    $detUsr = trim((string) ($_GET['det_usr'] ?? ($_GET['usuarioFiltro'] ?? '')));
+    $detTarifa = trim((string) ($_GET['det_tarifa'] ?? ($_GET['tarifaIva'] ?? '')));
+    $detMin = isset($_GET['det_min']) && $_GET['det_min'] !== '' ? (float) $_GET['det_min'] : (isset($_GET['montoMin']) && $_GET['montoMin'] !== '' ? (float) $_GET['montoMin'] : null);
+    $detMax = isset($_GET['det_max']) && $_GET['det_max'] !== '' ? (float) $_GET['det_max'] : (isset($_GET['montoMax']) && $_GET['montoMax'] !== '' ? (float) $_GET['montoMax'] : null);
+
+    // Módulo 7: Directorio de Usuarios
+    $rolFiltro = strtoupper(trim((string) ($_GET['rol_filtro'] ?? ($_GET['rolFiltro'] ?? ''))));
+    $rolEstado = strtoupper(trim((string) ($_GET['rol_estado'] ?? '')));
+
+    // Formato de exportación CSV específico por módulo
+    $exportFormat = strtolower(trim((string) ($_GET['export'] ?? '')));
 
     $gastoCtrl = DependencyInjection::getGastoController();
     $userCtrl = DependencyInjection::getUserController();
@@ -1236,85 +1266,331 @@ function buildReportsViewData(): array
     $allGastos = $gastoCtrl->index();
     $allUsers = $userCtrl->index();
 
-    // 1. Benchmarks Globales (Todos los gastos sin filtros para contexto)
+    // 1. Benchmarks Globales (Todos los gastos sin filtros para contexto general)
     $globalSinIva = 0.0;
     $globalIva = 0.0;
     $globalConIva = 0.0;
+    $distinctUserNames = array();
     foreach ($allGastos as $g) {
         $globalSinIva += $g->getValorTotalSinIVA();
         $globalIva += $g->getIvaTotal();
         $globalConIva += $g->getValorTotalConIVA();
+        $distinctUserNames[$g->getNombreUsuario()] = true;
     }
+    foreach ($allUsers as $u) {
+        $distinctUserNames[$u->getName()] = true;
+    }
+    ksort($distinctUserNames);
+
+    // Responsables que REALMENTE tienen gastos registrados. Los reportes 3 y 6 proyectan
+    // solo sobre `gastos`, asi que ofrecer usuarios sin movimientos devolvia tablas vacias
+    // y el filtro parecia roto. Esta lista alimenta esos dos selectores.
+    $gastoUserNames = array();
+    foreach ($allGastos as $g) {
+        $gastoUserNames[$g->getNombreUsuario()] = true;
+    }
+    ksort($gastoUserNames);
     $globalCount = count($allGastos);
     $globalAvg = $globalCount > 0 ? ($globalConIva / $globalCount) : 0.0;
 
-    // 2. Consulta de Lectura CQRS Filtrada (Base de Datos / InMemory)
-    $hasDbFilters = ($usuarioFiltro !== '' || $fechaDesde !== '' || $fechaHasta !== '');
-    $queryGastos = $hasDbFilters
-        ? $gastoCtrl->index(
-            $usuarioFiltro !== '' ? $usuarioFiltro : null,
-            $fechaDesde !== '' ? $fechaDesde : null,
-            $fechaHasta !== '' ? $fechaHasta : null
-        )
-        : $allGastos;
+    // Seguridad (OWASP CSV/Formula Injection): neutraliza celdas de texto libre que Excel
+    // interpretaría como fórmula (=, +, -, @, tab, retorno de carro) anteponiendo un apóstrofo.
+    $csvSafe = static fn(string $v): string => ($v !== '' && str_contains("=+-@\t\r", $v[0])) ? "'" . $v : $v;
 
-    // 3. Proyecciones en memoria (Lugar, Tarifa IVA, Rango de Montos)
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 1: AUDITORÍA FISCAL DE IVA (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
+    $taxGastos = array();
+    $taxTotalSinIva = 0.0;
+    $taxTotalIva = 0.0;
+    $taxTotalConIva = 0.0;
+    foreach ($allGastos as $g) {
+        if ($ivaDesde !== '' && $g->getFecha() < $ivaDesde) { continue; }
+        if ($ivaHasta !== '' && $g->getFecha() > $ivaHasta) { continue; }
+        $s = $g->getValorTotalSinIVA();
+        $i = $g->getIvaTotal();
+        $calcRate = $s > 0 ? (int) round(($i / $s) * 100) : 0;
+        if ($ivaTarifa === '19' && $calcRate !== 19) { continue; }
+        if ($ivaTarifa === '5' && $calcRate !== 5) { continue; }
+        if ($ivaTarifa === '0' && $calcRate !== 0) { continue; }
+        if ($ivaTarifa === 'other' && in_array($calcRate, array(0, 5, 19), true)) { continue; }
+
+        $taxGastos[] = $g;
+        $taxTotalSinIva += $s;
+        $taxTotalIva += $i;
+        $taxTotalConIva += $g->getValorTotalConIVA();
+    }
+
+    $taxBuckets = array(
+        '19' => array('key' => '19', 'label' => 'IVA General (19%)', 'rate' => 19, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
+        '5'  => array('key' => '5',  'label' => 'IVA Reducido (5%)',  'rate' => 5,  'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
+        '0'  => array('key' => '0',  'label' => 'Exento de IVA (0%)', 'rate' => 0,  'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
+        'other' => array('key' => 'other', 'label' => 'Otras Tarifas / Especial', 'rate' => -1, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
+    );
+    foreach ($taxGastos as $g) {
+        $s = $g->getValorTotalSinIVA();
+        $i = $g->getIvaTotal();
+        $c = $g->getValorTotalConIVA();
+        $calcRate = $s > 0 ? (int) round(($i / $s) * 100) : 0;
+        $bKey = match ($calcRate) { 19 => '19', 5 => '5', 0 => '0', default => 'other' };
+        $taxBuckets[$bKey]['count']++;
+        $taxBuckets[$bKey]['sinIva'] += $s;
+        $taxBuckets[$bKey]['iva'] += $i;
+        $taxBuckets[$bKey]['conIva'] += $c;
+    }
+    foreach ($taxBuckets as &$tb) {
+        $tb['share'] = $taxTotalConIva > 0 ? ($tb['conIva'] / $taxTotalConIva) * 100.0 : 0.0;
+    }
+    unset($tb);
+
+    if ($exportFormat === 'csv_iva') {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="reporte_auditoria_fiscal_iva_' . date('Ymd_His') . '.csv"');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array('Tarifa Impositiva', 'Transacciones', 'Base Gravable Sin IVA', 'IVA Liquidado', 'Total Con IVA', 'Porcentaje Participacion'));
+        foreach ($taxBuckets as $tb) {
+            fputcsv($out, array(
+                $tb['label'],
+                $tb['count'],
+                number_format($tb['sinIva'], 2, '.', ''),
+                number_format($tb['iva'], 2, '.', ''),
+                number_format($tb['conIva'], 2, '.', ''),
+                number_format($tb['share'], 1, '.', '') . '%',
+            ));
+        }
+        fclose($out);
+        exit;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 2: RANKING POR LUGAR / COMERCIO (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
+    $needleLugar = mb_strtolower($lugQ);
+    $lugarBuckets = array();
+    $lugarTotalConIva = 0.0;
+    foreach ($allGastos as $g) {
+        $lName = $g->getLugar();
+        $lKey = mb_strtolower($lName);
+        if ($needleLugar !== '' && !str_contains($lKey, $needleLugar)) {
+            continue;
+        }
+        $s = $g->getValorTotalSinIVA();
+        $i = $g->getIvaTotal();
+        $c = $g->getValorTotalConIVA();
+        $lugarTotalConIva += $c;
+        if (!isset($lugarBuckets[$lKey])) {
+            $lugarBuckets[$lKey] = array('lugar' => $lName, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0);
+        }
+        $lugarBuckets[$lKey]['count']++;
+        $lugarBuckets[$lKey]['sinIva'] += $s;
+        $lugarBuckets[$lKey]['iva'] += $i;
+        $lugarBuckets[$lKey]['conIva'] += $c;
+    }
+    $byLugar = array_values($lugarBuckets);
+    if ($lugOrder === 'count') {
+        usort($byLugar, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
+    } elseif ($lugOrder === 'sinIva') {
+        usort($byLugar, static fn(array $a, array $b): int => $b['sinIva'] <=> $a['sinIva']);
+    } else {
+        usort($byLugar, static fn(array $a, array $b): int => $b['conIva'] <=> $a['conIva']);
+    }
+    foreach ($byLugar as &$lRow) {
+        $lRow['share'] = $lugarTotalConIva > 0 ? ($lRow['conIva'] / $lugarTotalConIva) * 100.0 : 0.0;
+    }
+    unset($lRow);
+
+    if ($exportFormat === 'csv_lugar') {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="reporte_ranking_lugares_' . date('Ymd_His') . '.csv"');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array('Lugar o Comercio', 'Transacciones', 'Base Sin IVA', 'IVA Total', 'Total Con IVA', 'Porcentaje Participacion'));
+        foreach ($byLugar as $row) {
+            fputcsv($out, array(
+                $csvSafe($row['lugar']),
+                $row['count'],
+                number_format($row['sinIva'], 2, '.', ''),
+                number_format($row['iva'], 2, '.', ''),
+                number_format($row['conIva'], 2, '.', ''),
+                number_format($row['share'], 1, '.', '') . '%',
+            ));
+        }
+        fclose($out);
+        exit;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 3: CONSOLIDADO POR USUARIO RESPONSABLE (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
+    $needleUsr = mb_strtolower($usrQ);
+    $userBuckets = array();
+    $userTotalConIva = 0.0;
+    foreach ($allGastos as $g) {
+        $uName = $g->getNombreUsuario();
+        $uKey = mb_strtolower($uName);
+        if ($needleUsr !== '' && !str_contains($uKey, $needleUsr)) {
+            continue;
+        }
+        $s = $g->getValorTotalSinIVA();
+        $i = $g->getIvaTotal();
+        $c = $g->getValorTotalConIVA();
+        if ($usrMin !== null && $c < $usrMin) { continue; }
+        if ($usrMax !== null && $c > $usrMax) { continue; }
+
+        $userTotalConIva += $c;
+        if (!isset($userBuckets[$uKey])) {
+            $userBuckets[$uKey] = array('usuario' => $uName, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0);
+        }
+        $userBuckets[$uKey]['count']++;
+        $userBuckets[$uKey]['sinIva'] += $s;
+        $userBuckets[$uKey]['iva'] += $i;
+        $userBuckets[$uKey]['conIva'] += $c;
+    }
+    $byUser = array_values($userBuckets);
+    usort($byUser, static fn(array $a, array $b): int => $b['conIva'] <=> $a['conIva']);
+    foreach ($byUser as &$uRow) {
+        $uRow['share'] = $userTotalConIva > 0 ? ($uRow['conIva'] / $userTotalConIva) * 100.0 : 0.0;
+    }
+    unset($uRow);
+
+    if ($exportFormat === 'csv_usuario') {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="reporte_consolidado_usuarios_' . date('Ymd_His') . '.csv"');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array('Usuario Responsable', 'Operaciones', 'Subtotal Sin IVA', 'IVA Total', 'Total Con IVA', 'Porcentaje Presupuesto'));
+        foreach ($byUser as $row) {
+            fputcsv($out, array(
+                $csvSafe($row['usuario']),
+                $row['count'],
+                number_format($row['sinIva'], 2, '.', ''),
+                number_format($row['iva'], 2, '.', ''),
+                number_format($row['conIva'], 2, '.', ''),
+                number_format($row['share'], 1, '.', '') . '%',
+            ));
+        }
+        fclose($out);
+        exit;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 4: EVOLUCIÓN TEMPORAL MENSUAL (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
+    $monthlyBuckets = array();
+    $monthTotalConIva = 0.0;
+    foreach ($allGastos as $g) {
+        $f = $g->getFecha();
+        if ($mesDesde !== '' && $f < $mesDesde) { continue; }
+        if ($mesHasta !== '' && $f > $mesHasta) { continue; }
+        $s = $g->getValorTotalSinIVA();
+        $i = $g->getIvaTotal();
+        $c = $g->getValorTotalConIVA();
+        $monthTotalConIva += $c;
+        $ym = substr($f, 0, 7);
+        if (!isset($monthlyBuckets[$ym])) {
+            $monthlyBuckets[$ym] = array('mes' => $ym, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0);
+        }
+        $monthlyBuckets[$ym]['count']++;
+        $monthlyBuckets[$ym]['sinIva'] += $s;
+        $monthlyBuckets[$ym]['iva'] += $i;
+        $monthlyBuckets[$ym]['conIva'] += $c;
+    }
+    ksort($monthlyBuckets);
+    $byMonth = array_values($monthlyBuckets);
+    foreach ($byMonth as &$mRow) {
+        $mRow['share'] = $monthTotalConIva > 0 ? ($mRow['conIva'] / $monthTotalConIva) * 100.0 : 0.0;
+        $mRow['avg'] = $mRow['count'] > 0 ? ($mRow['conIva'] / $mRow['count']) : 0.0;
+    }
+    unset($mRow);
+
+    if ($exportFormat === 'csv_mensual') {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="reporte_historico_mensual_' . date('Ymd_His') . '.csv"');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array('Periodo Mensual', 'Operaciones', 'Sin IVA', 'IVA', 'Total Con IVA', 'Ticket Medio', 'Porcentaje'));
+        foreach ($byMonth as $row) {
+            fputcsv($out, array(
+                $row['mes'],
+                $row['count'],
+                number_format($row['sinIva'], 2, '.', ''),
+                number_format($row['iva'], 2, '.', ''),
+                number_format($row['conIva'], 2, '.', ''),
+                number_format($row['avg'], 2, '.', ''),
+                number_format($row['share'], 1, '.', '') . '%',
+            ));
+        }
+        fclose($out);
+        exit;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 5: TOP GASTOS DE MAYOR IMPACTO (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
+    $needleTopLugar = mb_strtolower($topLugar);
+    $poolTop = array();
+    foreach ($allGastos as $g) {
+        if ($needleTopLugar !== '' && !str_contains(mb_strtolower($g->getLugar()), $needleTopLugar)) {
+            continue;
+        }
+        $poolTop[] = $g;
+    }
+    usort($poolTop, static fn(GastoResponse $a, GastoResponse $b): int => $b->getValorTotalConIVA() <=> $a->getValorTotalConIVA());
+    $topGastos = array_slice($poolTop, 0, $topLimit);
+
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 6: TABLA DETALLADA DE GASTOS (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
     $filteredGastos = array();
-    $needleLugar = mb_strtolower($qLugar);
+    $detNeedle = mb_strtolower($detQ);
+    $detSinTotal = 0.0;
+    $detIvaTotal = 0.0;
+    $detConTotal = 0.0;
+    $minTransaction = null;
+    $maxTransaction = null;
 
-    foreach ($queryGastos as $g) {
-        $sin = $g->getValorTotalSinIVA();
-        $iva = $g->getIvaTotal();
-        $con = $g->getValorTotalConIVA();
+    foreach ($allGastos as $g) {
+        if ($detDesde !== '' && $g->getFecha() < $detDesde) { continue; }
+        if ($detHasta !== '' && $g->getFecha() > $detHasta) { continue; }
+        if ($detUsr !== '' && mb_strtolower($g->getNombreUsuario()) !== mb_strtolower($detUsr)) { continue; }
+        if ($detNeedle !== '') {
+            $matched = str_contains(mb_strtolower($g->getLugar()), $detNeedle)
+                || str_contains(mb_strtolower($g->getDescripcion()), $detNeedle)
+                || str_contains(mb_strtolower($g->getNombreUsuario()), $detNeedle);
+            if (!$matched) { continue; }
+        }
+        $s = $g->getValorTotalSinIVA();
+        $i = $g->getIvaTotal();
+        $c = $g->getValorTotalConIVA();
+        if ($detMin !== null && $c < $detMin) { continue; }
+        if ($detMax !== null && $c > $detMax) { continue; }
 
-        // Filtro por lugar (búsqueda substring insensible a mayúsculas/minúsculas)
-        if ($needleLugar !== '' && !str_contains(mb_strtolower($g->getLugar()), $needleLugar)) {
-            continue;
-        }
+        $calcRate = $s > 0 ? (int) round(($i / $s) * 100) : 0;
+        if ($detTarifa === '19' && $calcRate !== 19) { continue; }
+        if ($detTarifa === '5' && $calcRate !== 5) { continue; }
+        if ($detTarifa === '0' && $calcRate !== 0) { continue; }
+        if ($detTarifa === 'other' && in_array($calcRate, array(0, 5, 19), true)) { continue; }
 
-        // Filtro por tarifa de IVA estimada
-        $calcRate = $sin > 0 ? (int) round(($iva / $sin) * 100) : 0;
-        if ($tarifaIva === '19' && $calcRate !== 19) {
-            continue;
-        }
-        if ($tarifaIva === '5' && $calcRate !== 5) {
-            continue;
-        }
-        if ($tarifaIva === '0' && $calcRate !== 0) {
-            continue;
-        }
-        if ($tarifaIva === 'other' && in_array($calcRate, array(0, 5, 19), true)) {
-            continue;
-        }
+        $detSinTotal += $s;
+        $detIvaTotal += $i;
+        $detConTotal += $c;
 
-        // Filtro por rango de montos (con IVA)
-        if ($montoMin !== null && $con < $montoMin) {
-            continue;
-        }
-        if ($montoMax !== null && $con > $montoMax) {
-            continue;
-        }
+        if ($minTransaction === null || $c < $minTransaction) { $minTransaction = $c; }
+        if ($maxTransaction === null || $c > $maxTransaction) { $maxTransaction = $c; }
 
         $filteredGastos[] = $g;
     }
 
-    // 4. Exportación a CSV compatible con Microsoft Excel (UTF-8 con BOM)
-    if ($exportFormat === 'csv') {
+    $detCount = count($filteredGastos);
+    $detAvg = $detCount > 0 ? ($detConTotal / $detCount) : 0.0;
+
+    if ($exportFormat === 'csv_detalle' || $exportFormat === 'csv') {
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="reporte_cqrs_gastos_' . date('Ymd_His') . '.csv"');
-        header('Pragma: no-cache');
-        header('Expires: 0');
-
         $out = fopen('php://output', 'wb');
-        // BOM UTF-8 para que Excel reconozca tildes y caracteres especiales
         fwrite($out, "\xEF\xBB\xBF");
-
         fputcsv($out, array('ID', 'Fecha', 'Usuario Responsable', 'Lugar / Comercio', 'Descripción', 'Subtotal Sin IVA', 'IVA Total', 'Total Con IVA', 'Tarifa IVA Estimada'));
-
-        // Seguridad (OWASP CSV/Formula Injection): neutraliza celdas de texto libre que Excel
-        // interpretaría como fórmula (=, +, -, @, tab, retorno de carro) anteponiendo un apóstrofo.
-        $csvSafe = static fn(string $v): string => ($v !== '' && str_contains("=+-@\t\r", $v[0])) ? "'" . $v : $v;
-
         foreach ($filteredGastos as $fg) {
             $s = $fg->getValorTotalSinIVA();
             $i = $fg->getIvaTotal();
@@ -1332,193 +1608,54 @@ function buildReportsViewData(): array
                 $rateStr,
             ));
         }
-
         fclose($out);
         exit;
     }
 
-    // 5. Agrupaciones y Cálculos sobre el conjunto filtrado
-    $filteredSinIva = 0.0;
-    $filteredIva = 0.0;
-    $filteredConIva = 0.0;
-    $minTransaction = null;
-    $maxTransaction = null;
-
-    $lugarBuckets = array();
-    $userBuckets = array();
-    $monthlyBuckets = array();
-
-    $taxBuckets = array(
-        '19' => array('key' => '19', 'label' => 'IVA General (19%)', 'rate' => 19, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
-        '5'  => array('key' => '5',  'label' => 'IVA Reducido (5%)',  'rate' => 5,  'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
-        '0'  => array('key' => '0',  'label' => 'Exento de IVA (0%)', 'rate' => 0,  'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
-        'other' => array('key' => 'other', 'label' => 'Otras Tarifas / Especial', 'rate' => -1, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0, 'share' => 0.0),
-    );
-
-    foreach ($filteredGastos as $g) {
-        $s = $g->getValorTotalSinIVA();
-        $i = $g->getIvaTotal();
-        $c = $g->getValorTotalConIVA();
-
-        $filteredSinIva += $s;
-        $filteredIva += $i;
-        $filteredConIva += $c;
-
-        if ($minTransaction === null || $c < $minTransaction) {
-            $minTransaction = $c;
-        }
-        if ($maxTransaction === null || $c > $maxTransaction) {
-            $maxTransaction = $c;
-        }
-
-        // Por Lugar
-        $lName = $g->getLugar();
-        $lKey = mb_strtolower($lName);
-        if (!isset($lugarBuckets[$lKey])) {
-            $lugarBuckets[$lKey] = array('lugar' => $lName, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0);
-        }
-        $lugarBuckets[$lKey]['count']++;
-        $lugarBuckets[$lKey]['sinIva'] += $s;
-        $lugarBuckets[$lKey]['iva'] += $i;
-        $lugarBuckets[$lKey]['conIva'] += $c;
-
-        // Por Usuario Responsable
-        $uName = $g->getNombreUsuario();
-        $uKey = mb_strtolower($uName);
-        if (!isset($userBuckets[$uKey])) {
-            $userBuckets[$uKey] = array('usuario' => $uName, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0);
-        }
-        $userBuckets[$uKey]['count']++;
-        $userBuckets[$uKey]['sinIva'] += $s;
-        $userBuckets[$uKey]['iva'] += $i;
-        $userBuckets[$uKey]['conIva'] += $c;
-
-        // Por Mes (Evolución Temporal YYYY-MM)
-        $ym = substr($g->getFecha(), 0, 7);
-        if (!isset($monthlyBuckets[$ym])) {
-            $monthlyBuckets[$ym] = array('mes' => $ym, 'count' => 0, 'sinIva' => 0.0, 'iva' => 0.0, 'conIva' => 0.0);
-        }
-        $monthlyBuckets[$ym]['count']++;
-        $monthlyBuckets[$ym]['sinIva'] += $s;
-        $monthlyBuckets[$ym]['iva'] += $i;
-        $monthlyBuckets[$ym]['conIva'] += $c;
-
-        // Auditoría Fiscal por IVA
-        $calcRate = $s > 0 ? (int) round(($i / $s) * 100) : 0;
-        $bucketKey = match ($calcRate) {
-            19 => '19',
-            5 => '5',
-            0 => '0',
-            default => 'other',
-        };
-        $taxBuckets[$bucketKey]['count']++;
-        $taxBuckets[$bucketKey]['sinIva'] += $s;
-        $taxBuckets[$bucketKey]['iva'] += $i;
-        $taxBuckets[$bucketKey]['conIva'] += $c;
-    }
-
-    $filteredCount = count($filteredGastos);
-    $filteredAvg = $filteredCount > 0 ? ($filteredConIva / $filteredCount) : 0.0;
-
-    // Calcular participaciones porcentuales sobre la base filtrada
-    foreach ($taxBuckets as &$tb) {
-        $tb['share'] = $filteredConIva > 0 ? ($tb['conIva'] / $filteredConIva) * 100.0 : 0.0;
-    }
-    unset($tb);
-
-    $byLugar = array_values($lugarBuckets);
-    usort($byLugar, static fn(array $a, array $b): int => $b['conIva'] <=> $a['conIva']);
-    foreach ($byLugar as &$lRow) {
-        $lRow['share'] = $filteredConIva > 0 ? ($lRow['conIva'] / $filteredConIva) * 100.0 : 0.0;
-    }
-    unset($lRow);
-
-    $byUser = array_values($userBuckets);
-    usort($byUser, static fn(array $a, array $b): int => $b['conIva'] <=> $a['conIva']);
-    foreach ($byUser as &$uRow) {
-        $uRow['share'] = $filteredConIva > 0 ? ($uRow['conIva'] / $filteredConIva) * 100.0 : 0.0;
-    }
-    unset($uRow);
-
-    ksort($monthlyBuckets);
-    $byMonth = array_values($monthlyBuckets);
-    foreach ($byMonth as &$mRow) {
-        $mRow['share'] = $filteredConIva > 0 ? ($mRow['conIva'] / $filteredConIva) * 100.0 : 0.0;
-        $mRow['avg'] = $mRow['count'] > 0 ? ($mRow['conIva'] / $mRow['count']) : 0.0;
-    }
-    unset($mRow);
-
-    // Top 5 Gastos de Mayor Impacto
-    $topGastos = $filteredGastos;
-    usort($topGastos, static fn(GastoResponse $a, GastoResponse $b): int => $b->getValorTotalConIVA() <=> $a->getValorTotalConIVA());
-    $topGastos = array_slice($topGastos, 0, 5);
-
-    // Chips de Filtros Activos para UI.
-    // Seguridad (OWASP A03 XSS): 'value' se entrega YA escapado con htmlspecialchars porque la
-    // vista lo imprime en crudo para poder conservar entidades seguras como &rarr; y &infin;.
-    $esc = static fn(string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
-    $activeFilters = array();
-    if ($qLugar !== '') {
-        $activeFilters[] = array('param' => 'qLugar', 'label' => 'Lugar', 'value' => $esc($qLugar));
-    }
-    if ($fechaDesde !== '' || $fechaHasta !== '') {
-        $rangeVal = ($fechaDesde !== '' ? $esc($fechaDesde) : 'Inicio') . ' &rarr; ' . ($fechaHasta !== '' ? $esc($fechaHasta) : 'Fin');
-        $activeFilters[] = array('param' => 'fechaRango', 'label' => 'Rango Fechas', 'value' => $rangeVal);
-    }
-    if ($usuarioFiltro !== '') {
-        $activeFilters[] = array('param' => 'usuarioFiltro', 'label' => 'Usuario', 'value' => $esc($usuarioFiltro));
-    }
-    if ($tarifaIva !== '') {
-        $ivaLabel = match ($tarifaIva) {
-            '19' => '19% General',
-            '5' => '5% Reducido',
-            '0' => '0% Exento',
-            'other' => 'Otras',
-            default => $esc($tarifaIva),
-        };
-        $activeFilters[] = array('param' => 'tarifaIva', 'label' => 'Tarifa IVA', 'value' => $ivaLabel);
-    }
-    if ($montoMin !== null || $montoMax !== null) {
-        $montoVal = '$' . number_format($montoMin ?? 0, 0, ',', '.') . ' - ' . ($montoMax !== null ? '$' . number_format($montoMax, 0, ',', '.') : '&infin;');
-        $activeFilters[] = array('param' => 'montoRango', 'label' => 'Monto', 'value' => $montoVal);
-    }
-
-    // Directorio de Usuarios filtrados por rol
+    // ─────────────────────────────────────────────────────────────
+    // PROYECCIÓN 7: DIRECTORIO DE USUARIOS POR ROL (Filtro propio)
+    // ─────────────────────────────────────────────────────────────
     $roleCounts = array(
         UserRoleEnum::ADMIN => 0,
         UserRoleEnum::MEMBER => 0,
         UserRoleEnum::REVIEWER => 0,
     );
     $filteredUsers = array();
-    $distinctUserNames = array();
     foreach ($allUsers as $u) {
         $r = $u->getRole();
         $roleCounts[$r] = ($roleCounts[$r] ?? 0) + 1;
-        if ($rolFiltro === '' || $r === $rolFiltro) {
-            $filteredUsers[] = $u;
-        }
-        $distinctUserNames[$u->getName()] = true;
+        if ($rolFiltro !== '' && $r !== $rolFiltro) { continue; }
+        if ($rolEstado !== '' && $u->getStatus() !== $rolEstado) { continue; }
+        $filteredUsers[] = $u;
     }
-    foreach ($allGastos as $ag) {
-        $distinctUserNames[$ag->getNombreUsuario()] = true;
-    }
-    ksort($distinctUserNames);
 
     return array(
         'pageTitle' => 'Reportes Analíticos CQRS',
         'filters' => array(
-            'qLugar' => $qLugar,
-            'fechaDesde' => $fechaDesde,
-            'fechaHasta' => $fechaHasta,
-            'usuarioFiltro' => $usuarioFiltro,
-            'tarifaIva' => $tarifaIva,
-            'montoMin' => $montoMin !== null ? (string) $montoMin : '',
-            'montoMax' => $montoMax !== null ? (string) $montoMax : '',
-            'rolFiltro' => $rolFiltro,
+            'iva_desde' => $ivaDesde,
+            'iva_hasta' => $ivaHasta,
+            'iva_tarifa' => $ivaTarifa,
+            'lug_q' => $lugQ,
+            'lug_order' => $lugOrder,
+            'usr_q' => $usrQ,
+            'usr_min' => $usrMin !== null ? (string) $usrMin : '',
+            'usr_max' => $usrMax !== null ? (string) $usrMax : '',
+            'mes_desde' => $mesDesde,
+            'mes_hasta' => $mesHasta,
+            'top_limit' => $topLimit,
+            'top_lugar' => $topLugar,
+            'det_q' => $detQ,
+            'det_desde' => $detDesde,
+            'det_hasta' => $detHasta,
+            'det_usr' => $detUsr,
+            'det_tarifa' => $detTarifa,
+            'det_min' => $detMin !== null ? (string) $detMin : '',
+            'det_max' => $detMax !== null ? (string) $detMax : '',
+            'rol_filtro' => $rolFiltro,
+            'rol_estado' => $rolEstado,
         ),
-        'activeFilters' => $activeFilters,
-        'hasActiveFilters' => !empty($activeFilters),
         'distinctUserNames' => array_keys($distinctUserNames),
+        'gastoUserNames' => array_keys($gastoUserNames),
         'globalTotals' => array(
             'count' => $globalCount,
             'sinIva' => $globalSinIva,
@@ -1527,21 +1664,40 @@ function buildReportsViewData(): array
             'avgConIva' => $globalAvg,
             'usersCount' => count($allUsers),
         ),
-        'filteredTotals' => array(
-            'count' => $filteredCount,
-            'sinIva' => $filteredSinIva,
-            'iva' => $filteredIva,
-            'conIva' => $filteredConIva,
-            'avgConIva' => $filteredAvg,
+        'taxBuckets' => $taxBuckets,
+        'taxTotals' => array(
+            'count' => count($taxGastos),
+            'sinIva' => $taxTotalSinIva,
+            'iva' => $taxTotalIva,
+            'conIva' => $taxTotalConIva,
+        ),
+        'byLugar' => $byLugar,
+        'lugarTotalConIva' => $lugarTotalConIva,
+        'byUser' => $byUser,
+        'userTotalConIva' => $userTotalConIva,
+        'byMonth' => $byMonth,
+        'monthTotalConIva' => $monthTotalConIva,
+        'topGastos' => $topGastos,
+        'filteredGastos' => $filteredGastos,
+        'detTotals' => array(
+            'count' => $detCount,
+            'sinIva' => $detSinTotal,
+            'iva' => $detIvaTotal,
+            'conIva' => $detConTotal,
+            'avgConIva' => $detAvg,
             'min' => $minTransaction ?? 0.0,
             'max' => $maxTransaction ?? 0.0,
         ),
-        'taxBuckets' => $taxBuckets,
-        'byLugar' => $byLugar,
-        'byUser' => $byUser,
-        'byMonth' => $byMonth,
-        'topGastos' => $topGastos,
-        'filteredGastos' => $filteredGastos,
+        // Retrocompatibilidad para tests
+        'filteredTotals' => array(
+            'count' => $detCount,
+            'sinIva' => $detSinTotal,
+            'iva' => $detIvaTotal,
+            'conIva' => $detConTotal,
+            'avgConIva' => $detAvg,
+            'min' => $minTransaction ?? 0.0,
+            'max' => $maxTransaction ?? 0.0,
+        ),
         'roleCounts' => $roleCounts,
         'filteredUsers' => $filteredUsers,
     );

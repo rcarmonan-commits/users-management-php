@@ -45,6 +45,7 @@ Repositorio desarrollado a partir del **Fork oficial** de [`arrietajohn/hexagona
 7. [Instrucciones de Instalación, Ejecución Local y Docker](#7-instrucciones-de-instalación-ejecución-local-y-docker)
 8. [Suite de Pruebas Automatizadas (70 Verificaciones de Arquitectura y Seguridad)](#8-suite-de-pruebas-automatizadas-70-verificaciones-de-arquitectura-y-seguridad)
 9. [Despliegue Cloud (Render + Alwaysdata + Pasarela HTTPS 443) y CI/CD](#9-despliegue-cloud-render--alwaysdata--pasarela-https-443-y-cicd)
+10. [Centro de Reportes Analíticos CQRS con Filtros Independientes](#10-centro-de-reportes-analíticos-cqrs-con-filtros-independientes)
 
 ---
 
@@ -566,4 +567,42 @@ Cubre invariantes contables de IVA en centavos, inmutabilidad de Value Objects, 
 - **Render Cloud:** Blueprint `render.yaml` y `Dockerfile` configurados para levantar el servidor web en producción con puerto dinámico `$PORT`.
 - **Base de Datos Alwaysdata MySQL:** Aloja las tablas `users`, `roles`, `gastos`, `configuracion_smtp` y `hex_cloud_email_relay`.
 - **Pasarela HTTPS 443 (Google Apps Script):** Supera el bloqueo de puertos salientes 25/465/587 del plan gratuito de Render mediante un micro-webhook seguro que entrega correos directamente en las bandejas de entrada de Gmail sin costo adicional.
-- **GitHub Actions:** Pipeline automatizado en `devops/github-actions-ci-cd.yml` con etapas de lint de código, verificación de base de datos MySQL 8, ejecución de la suite de pruebas y despliegue continuo.
+- **GitHub Actions:** Pipeline automatizado en `.github/workflows/ci-cd.yml` con etapas de lint de código sobre los 158 archivos PHP, migración de base de datos MySQL 8, ejecución de la suite de 70 pruebas y verificación del build Docker, más un job de despliegue continuo hacia Render. Se dispara en `push` a `main` y ramas `feature/**`, `fix/**` y `security/**`, en `pull_request` contra `main`, y admite ejecución manual mediante `workflow_dispatch` desde la pestaña *Actions*.
+
+
+---
+
+## 10. Centro de Reportes Analíticos CQRS con Filtros Independientes
+
+La ruta `?route=reports` materializa el lado **Query** de CQRS: siete proyecciones de solo lectura
+construidas sobre `GetAllGastosUseCase` y `GetAllUsersUseCase`, sin pasar por los comandos ni
+modificar estado alguno.
+
+Cada módulo tiene **su propio formulario de filtros y su propio ancla de navegación**. Al aplicar
+un filtro, los demás reportes conservan el suyo y la página regresa exactamente al módulo
+consultado en lugar de saltar al inicio.
+
+| # | Proyección | Parámetros propios | Exportación |
+|---|---|---|---|
+| 1 | Auditoría Fiscal y Desglose de IVA | `iva_desde`, `iva_hasta`, `iva_tarifa` | `export=csv_iva` |
+| 2 | Ranking y Concentración por Lugar | `lug_q`, `lug_order` | `export=csv_lugar` |
+| 3 | Consolidado por Usuario Responsable | `usr_q`, `usr_min`, `usr_max` | `export=csv_usuario` |
+| 4 | Evolución Temporal Mensual | `mes_desde`, `mes_hasta` | `export=csv_mensual` |
+| 5 | Top Gastos de Mayor Impacto | `top_limit`, `top_lugar` | proyección interactiva |
+| 6 | Detalle Transaccional Completo | `det_q`, `det_desde`, `det_hasta`, `det_usr`, `det_tarifa`, `det_min`, `det_max` | `export=csv_detalle` |
+| 7 | Directorio de Usuarios por Rol | `rol_filtro`, `rol_estado` | proyección interactiva |
+
+### Decisión de diseño: origen de los responsables
+
+El selector del reporte 3 se alimenta **exclusivamente de los responsables presentes en `gastos`**.
+La tabla `gastos` almacena en `nombre_usuario` el *identificador* de la cuenta (`admin`, `ser`,
+`Rosa car`), no el nombre de presentación de `usuarios` (`Administrador`, `RosaryE`). Ofrecer la
+unión de ambas fuentes producía opciones que nunca casaban y devolvían tablas vacías, dando la
+impresión de un filtro averiado. Restringir el origen garantiza que **toda opción del desplegable
+devuelve al menos una fila**.
+
+### Seguridad en la exportación
+
+Toda celda de texto libre exportada a CSV se sanea contra **CSV/Formula Injection**: si comienza
+por `=`, `+`, `-`, `@`, tabulador o retorno de carro, se le antepone un apóstrofo, y el archivo se
+emite con BOM UTF-8 (`ï»¿`) para que Excel respete los acentos sin interpretar fórmulas.
