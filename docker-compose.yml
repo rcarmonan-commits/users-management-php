@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hexagonal_usuarios_gastos_app
+    ports:
+      - "8080:80"
+    environment:
+      APP_ENV: docker
+      DB_DRIVER: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: crud_usuarios
+      DB_USERNAME: root
+      DB_PASSWORD: root_password
+      DB_CHARSET: utf8mb4
+      SMTP_STRICT: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: hexagonal_usuarios_gastos_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: crud_usuarios
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./Infrastructure/Adapters/Persistence/MySQL/Database/mysql/database.sql:/docker-entrypoint-initdb.d/01-database.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
